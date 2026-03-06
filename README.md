@@ -1,16 +1,53 @@
-# React + Vite
+# SEGA HQ - Secure Network Monitoring Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A 3D cybersecurity visualization tool that lets operators monitor network devices across a multi-floor building, detect attacks in real-time, and quarantine compromised devices.
 
-Currently, two official plugins are available:
+Built with a retro SEGA aesthetic using pixel fonts, vibrant colours, and game-themed floor interiors.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## What It Does
 
-## React Compiler
+- **3D Building View** — Navigate a 5-floor building with orbit controls. Zoom into any floor to inspect individual devices.
+- **Device Monitoring** — Each device displays a real-time trust score (0-100%), status (active/compromised/quarantined), and type (server, router, workstation, etc).
+- **Attack Simulation** — Run a demo attack that randomly targets a device, showing the attack beam, trust score drop, data exfiltration, and alert generation.
+- **Quarantine & Scan** — Click any device to inspect it, then quarantine or scan it directly from the HUD.
+- **Threat Feed** — Live alert panel showing security events with severity levels (info, warning, critical).
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Floor Themes
 
-## Expanding the ESLint configuration
+Each floor is themed after a classic SEGA game:
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+| Floor | Theme | Visual Style |
+|-------|-------|-------------|
+| 1 | Green Hill Zone (Sonic) | Grass, checkered ground, loop ramps |
+| 2 | Kamuro-cho (Yakuza) | Dark streets, neon signs, vending machines |
+| 3 | Metaverse (Persona) | Red veins, spinning mask, tarot cards |
+| 4 | Dojo (Shenmue) | Zen sand, cherry blossoms, stone lanterns |
+| 5 | Chao Resort Island | Tropical palms, water pools, pastel colours |
+
+## Tech Stack
+
+- **React 19** — UI framework
+- **Three.js** (via React Three Fiber + Drei) — 3D rendering
+- **Zustand** — State management
+- **Tailwind CSS v4** — Styling
+- **Vite 7** — Build tool
+- **WebSocket** — Optional real-time data feed (app works without a backend)
+
+## Security Features
+
+- WebSocket payload validation and sanitization (XSS prevention)
+- HTML entity encoding on all external string data
+- Message size limits (4KB max) and type whitelisting
+- Login screen with SHA-256 password hashing and rate limiting (5 attempts, 30s lockout)
+- Session management with 1-hour auto-expiry
+- Full security report included (see `SECURITY_REPORT.md`)
+
+## How to Run
+
+**Prerequisites:** Node.js 18+
+
+```bash
+git clone https://github.com/boayusuf/utschytl.git
+cd utschytl
+npm install
+npm run dev
