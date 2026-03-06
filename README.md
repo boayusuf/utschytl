@@ -12,26 +12,17 @@ Built with a retro SEGA aesthetic using pixel fonts, vibrant colours, and game-t
 - **Quarantine & Scan**
 - **Threat Feed**
 
-## Floor Themes
-
 Each floor is themed after a classic SEGA game:
 
-| Floor | Theme | Visual Style |
-|-------|-------|-------------|
-| 1 | Green Hill Zone (Sonic) | Grass, checkered ground, loop ramps |
-| 2 | Kamuro-cho (Yakuza) | Dark streets, neon signs, vending machines |
-| 3 | Metaverse (Persona) | Red veins, spinning mask, tarot cards |
-| 4 | Dojo (Shenmue) | Zen sand, cherry blossoms, stone lanterns |
-| 5 | Chao Resort Island | Tropical palms, water pools, pastel colours |
 
 ## Tech Stack
 
-- **React 19** — UI framework
-- **Three.js** (via React Three Fiber + Drei) — 3D rendering
-- **Zustand** — State management
-- **Tailwind CSS v4** — Styling
-- **Vite 7** — Build tool
-- **WebSocket** — Optional real-time data feed (app works without a backend)
+- **React 19**
+- **Three.js**
+- **Zustand**
+- **Tailwind CSS v4**
+- **Vite 7**
+- **WebSocket**
 
 ## Security Features
 
@@ -43,7 +34,6 @@ Each floor is themed after a classic SEGA game:
 - Full security report included (see `SECURITY_REPORT.md`)
 
 ## How to Run
-
 **Prerequisites:** Node.js 18+
 
 ```bash
