@@ -6,11 +6,11 @@ Built with a retro SEGA aesthetic using pixel fonts, vibrant colours, and game-t
 
 ## What It Does
 
-- **3D Building View** — Navigate a 5-floor building with orbit controls. Zoom into any floor to inspect individual devices.
-- **Device Monitoring** — Each device displays a real-time trust score (0-100%), status (active/compromised/quarantined), and type (server, router, workstation, etc).
-- **Attack Simulation** — Run a demo attack that randomly targets a device, showing the attack beam, trust score drop, data exfiltration, and alert generation.
-- **Quarantine & Scan** — Click any device to inspect it, then quarantine or scan it directly from the HUD.
-- **Threat Feed** — Live alert panel showing security events with severity levels (info, warning, critical).
+- **3D Building View**
+- **Device Monitoring**
+- **Attack Simulation**
+- **Quarantine & Scan**
+- **Threat Feed**
 
 ## Floor Themes
 
