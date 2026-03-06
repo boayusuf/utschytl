@@ -1,4 +1,4 @@
-# SEGA HQ - Secure Network Monitoring Dashboard
+# Chao Security Garden
 
 A 3D cybersecurity visualization tool that lets operators monitor network devices across a multi-floor building, detect attacks in real-time, and quarantine compromised devices.
 
