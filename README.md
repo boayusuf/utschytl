@@ -14,7 +14,6 @@ Built with a retro SEGA aesthetic using pixel fonts, vibrant colours, and game-t
 
 Each floor is themed after a classic SEGA game:
 
-
 ## Tech Stack
 
 - **React 19**
