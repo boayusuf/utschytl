@@ -29,7 +29,7 @@
   <footer class="footer">
     <div class="wrap">
       <span>{{ APP_NAME }} · TeachAthon 2026, University of Edinburgh</span>
-      <span>AI: {{ LLM_LABEL }} · Storage: {{ STORE_LABEL }}</span>
+      {% if not HIDE_TECH %}<span>AI: {{ LLM_LABEL }} · Storage: {{ STORE_LABEL }}</span>{% endif %}
     </div>
   </footer>
   {% block scripts %}{% endblock %}

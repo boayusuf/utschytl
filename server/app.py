@@ -113,6 +113,7 @@ def inject_globals():
         "APP_TAGLINE": config.APP_TAGLINE,
         "LLM_LABEL": llm.provider_label(),
         "STORE_LABEL": config.STORE_BACKEND,
+        "HIDE_TECH": bool(os.environ.get("HIDE_TECH_FOOTER")),
     }
 
 

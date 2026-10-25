@@ -76,7 +76,7 @@
     const n = (o.criteria || []).length;
     const how = state.judgeVotes > 1
       ? `${state.judgeVotes} independent checks must agree, each quoting your words, before a tick turns green.`
-      : "A tick turns green only when your own words cover the point (offline demo mode: one check).";
+      : "A tick turns green only when your own words cover the point.";
     $("rubric-note").textContent = metIds.length === n && n ? "All points covered." : `${metIds.length} of ${n} covered. ${how}`;
   }
 
