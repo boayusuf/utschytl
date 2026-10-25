@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Discussion · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>Discussion</h1>
+  <p class="lede">Each week has a question board: ask anything, classmates and the lecturer answer, votes sort it. Your own explanations of each outcome live on the class wall inside practice.</p>
+  {% if not weeks %}<div class="empty">No published weeks yet.</div>{% endif %}
+  <div class="week-list">
+    {% for w in weeks %}
+    <div class="week-row">
+      <div><b>{{ w.course.title }}</b>{% if w.number %} · Week {{ w.number }}{% endif %}<br><span class="muted">{{ w.title }}</span></div>
+      <a class="btn btn-sm" href="/w/{{ w.id }}/questions">Open question board</a>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

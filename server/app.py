@@ -508,6 +508,14 @@ def _is_lecturer() -> bool:
     return bool(session.get("lecturer"))
 
 
+@app.get("/discussion")
+def discussion():
+    weeks = _published_weeks()
+    if len(weeks) == 1:
+        return redirect(f"/w/{weeks[0]['id']}/questions")
+    return render_template("discussion.html", weeks=weeks)
+
+
 @app.get("/w/<week_id>/questions")
 def forum(week_id):
     s = get_store()
