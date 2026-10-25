@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}Practise · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>Pick this week's outcomes</h1>
+  <p class="muted">You explain, the tutor asks. Nothing you type is shown to your lecturer with your name on it; only patterns across the class, and only once enough students have tried.</p>
+  {% if not weeks %}
+  <div class="empty">No week has been published yet. Ask your lecturer, or open the <a href="/teach">lecturer area</a> to publish one.</div>
+  {% else %}
+  <form method="post" action="/learn/start" class="panel">
+    <div class="field">
+      <label for="week_id">Course and week</label>
+      <select id="week_id" name="week_id" required>
+        {% for w in weeks %}
+        <option value="{{ w.id }}">{{ w.course.title }}{% if w.number %} · Week {{ w.number }}{% endif %} · {{ w.title }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label for="alias">A nickname for this session (optional)</label>
+      <input id="alias" name="alias" type="text" maxlength="24" placeholder="e.g. owl42" autocomplete="off">
+      <p class="hint">Only used so you can tell your sessions apart. Not shown to anyone.</p>
+    </div>
+    <button class="btn btn-lg" type="submit">Start</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

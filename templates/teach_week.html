@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Edit outcomes · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap" id="editor-app" data-week="{{ week.id }}">
+  <div class="page-head">
+    <div>
+      <p class="muted" style="margin:0"><a href="/teach">Your weeks</a> › {{ course.title }}{% if week.number %} · Week {{ week.number }}{% endif %}</p>
+      <h1 style="margin-top:0.25rem"><input id="week-title" type="text" value="{{ week.title }}" aria-label="Week title" style="font: inherit; font-weight:700; border:0; border-bottom:1px dashed var(--line-strong); border-radius:0; padding:0 0 0.1rem; background:transparent; width:100%"></h1>
+      <p class="muted">Edit anything. Each criterion has three parts: what the examiner checks (only you and the AI judge see this), the label students see (describes the kind of thing needed without saying it), and give-away words the tutor is forbidden to say. A student label that contains a give-away word is replaced automatically.</p>
+    </div>
+    <div>
+      {% if week.status == 'published' %}<span class="pill pill-teal">Published</span>{% else %}<span class="pill pill-amber">Draft, not visible to students</span>{% endif %}
+    </div>
+  </div>
+
+  <div class="editor">
+    <div>
+      <div id="outcomes"></div>
+      <button class="btn btn-secondary" type="button" id="add-outcome">+ Add an outcome</button>
+    </div>
+    <aside class="preview">
+      <div class="panel">
+        <h3>Student preview</h3>
+        <small class="muted">What the selected outcome looks like to a student.</small>
+        <div class="bigcard" style="margin-top:0.75rem; padding:1rem 1.1rem; box-shadow:none">
+          <div class="card-meta"><span id="pv-pos"></span><span id="pv-slide"></span></div>
+          <p class="card-prompt" id="pv-prompt" style="font-size:1.2rem"></p>
+        </div>
+        <ul class="rubric" id="pv-rubric" style="position:static; padding:0.75rem 0 0; list-style:none; margin:0"></ul>
+      </div>
+      <div class="panel" style="margin-top:1rem">
+        <h3>Source</h3>
+        <small class="muted">{{ week.material_chars or 0 }} characters of lecture material were used to draft this week.</small>
+      </div>
+    </aside>
+  </div>
+</div>
+<div class="savebar">
+  <div class="wrap">
+    <span id="save-status" class="muted">All changes saved</span>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap">
+      <a class="btn btn-secondary" href="/teach/week/{{ week.id }}/report">Gap report</a>
+      {% if week.status == 'published' %}
+      <button class="btn btn-secondary" type="button" id="unpublish">Unpublish</button>
+      {% else %}
+      <button class="btn btn-teal" type="button" id="publish">Publish to students</button>
+      {% endif %}
+    </div>
+  </div>
+</div>
+<script id="outcomes-data" type="application/json">{{ outcomes | tojson }}</script>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='editor.js') }}" defer></script>
+{% endblock %}

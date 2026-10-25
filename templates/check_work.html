@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Defend your work · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>Defend your own work</h1>
+  <p class="lede">Paste a piece of coursework you wrote: code, an essay, a report. The AI reads it and asks you three or four questions only its real author could answer, the way a viva would. Nothing is stored beyond this session and nothing is sent to anyone.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" enctype="multipart/form-data" class="panel" id="workform">
+    <div class="field">
+      <label for="work">Your work</label>
+      <textarea id="work" name="work" style="min-height:220px; font-family: ui-monospace, Menlo, monospace; font-size:0.9rem" placeholder="Paste your code, essay or report here…"></textarea>
+    </div>
+    <div class="field">
+      <label for="file">…or upload a PDF or text file</label>
+      <input id="file" name="file" type="file" accept=".pdf,.txt,.md,.py,.java,.js,.c,.cpp,.hs">
+    </div>
+    <div class="field">
+      <label for="alias">Nickname (optional)</label>
+      <input id="alias" name="alias" type="text" maxlength="24" autocomplete="off">
+    </div>
+    <button class="btn btn-lg" type="submit" id="workbtn">Ask me about it</button>
+    <p class="hint" id="workwait" hidden>Reading your work and writing questions… 10–20 seconds.</p>
+  </form>
+  <p class="muted" style="margin-top:1rem">Why this exists: AI-text detectors falsely flag up to 61% of non-native writers' essays. The honest alternative is to show you can explain what you submitted. Practise that here before anyone asks you for real.</p>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>document.getElementById('workform').addEventListener('submit',()=>{document.getElementById('workbtn').disabled=true;document.getElementById('workwait').hidden=false;});</script>
+{% endblock %}

@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Lecturer · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-head">
+    <div>
+      <h1>Your weeks</h1>
+      <p class="muted">Each week is a short list of outcomes students must be able to explain. Draft one from slides, edit, publish, then watch the gap report fill.</p>
+    </div>
+  </div>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+
+  <div class="editor">
+    <div>
+      {% if not courses %}
+      <div class="empty">No weeks yet. Draft your first one on the right, or
+        <form method="post" action="/teach/seed" style="display:inline"><button class="btn btn-sm btn-secondary" type="submit">load the demo week</button></form>
+        (Informatics 1, Week 5: Big-O, with nine simulated students and a class wall).</div>
+      {% endif %}
+      {% for c in courses %}
+      <section class="panel">
+        <h2>{{ c.title }}{% if c.code %} <span class="pill">{{ c.code }}</span>{% endif %}</h2>
+        <div class="week-list">
+          {% for w in c.weeks %}
+          <div class="week-row">
+            <div>
+              <b>{% if w.number %}Week {{ w.number }} · {% endif %}{{ w.title }}</b><br>
+              <span class="muted">{{ w.n_outcomes }} outcomes · {{ w.n_students }} student session{{ '' if w.n_students == 1 else 's' }}</span>
+            </div>
+            <div class="actions">
+              {% if w.status == 'published' %}<span class="pill pill-teal">Published</span>{% else %}<span class="pill pill-amber">Draft</span>{% endif %}
+              <a class="btn btn-sm btn-secondary" href="/teach/week/{{ w.id }}">Edit outcomes</a>
+              <a class="btn btn-sm" href="/teach/week/{{ w.id }}/report">Gap report</a>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endfor %}
+    </div>
+
+    <aside class="panel preview">
+      {% if courses %}<form method="post" action="/teach/seed" style="margin-bottom:1rem"><button class="btn btn-sm btn-ghost" type="submit" title="Adds the Informatics 1 Week 5 demo with simulated students">+ Load demo week</button></form>{% endif %}
+      <h3>Draft a new week</h3>
+      <p class="muted" style="font-size:0.92rem">Upload the slides as a PDF, or paste lecture notes. The AI drafts 8–14 outcomes with a rubric each; nothing is shown to students until you publish.</p>
+      <form method="post" action="/teach/week/new" enctype="multipart/form-data" id="newweek">
+        <div class="field">
+          <label for="course_title">Course</label>
+          <input id="course_title" name="course_title" type="text" required placeholder="e.g. Informatics 1: Computation and Logic" value="{{ form.course_title if form else '' }}">
+        </div>
+        <div class="row">
+          <div class="field"><label for="course_code">Code</label><input id="course_code" name="course_code" type="text" placeholder="INFR08025" value="{{ form.course_code if form else '' }}"></div>
+          <div class="field"><label for="week_number">Week</label><input id="week_number" name="week_number" type="number" min="1" max="52" placeholder="5" value="{{ form.week_number if form else '' }}"></div>
+        </div>
+        <div class="field">
+          <label for="slides">Slides (PDF)</label>
+          <input id="slides" name="slides" type="file" accept=".pdf,.txt,.md">
+          <p class="hint">Up to 4 MB. Text is extracted from the slides; nothing is stored except the text.</p>
+        </div>
+        <div class="field">
+          <label for="material">…or paste notes</label>
+          <textarea id="material" name="material" placeholder="Paste lecture notes or an outline here if you have no PDF.">{{ form.material if form else '' }}</textarea>
+        </div>
+        <button class="btn" type="submit" id="draft-btn">Draft outcomes</button>
+        <p class="hint" id="draft-wait" hidden>Reading the material and drafting… this takes 10–30 seconds.</p>
+      </form>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+document.getElementById('newweek').addEventListener('submit', () => {
+  document.getElementById('draft-btn').disabled = true;
+  document.getElementById('draft-wait').hidden = false;
+});
+</script>
+{% endblock %}

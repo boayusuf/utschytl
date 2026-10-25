@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}How it works · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>How {{ APP_NAME }} works</h1>
+  <p class="lede">A study tool for one specific failure: a student reads an AI's fluent explanation, feels the click of understanding, and discovers in the exam that they cannot produce it themselves. {{ APP_NAME }} only counts understanding the student can produce.</p>
+
+  <h2>The loop</h2>
+  <ol>
+    <li><b>Lecturer sets the target.</b> Slides go in; the AI drafts 8–14 learning outcomes, each with 2–4 rubric points. Every point has three parts: what the examiner checks (seen by lecturer and judge only), a label for the student that names the <em>kind</em> of thing needed without saying it, and "give-away words" the tutor may not use. The lecturer edits and publishes. A student label that contains a give-away word is replaced automatically.</li>
+    <li><b>Student rates, then explains.</b> Before each outcome the student rates how well they could explain it (1–5). Then they explain it in their own words.</li>
+    <li><b>Two judges, one tutor.</b> Every student message is scored against the rubric by two independent AI calls; a point is "met" only if both agree and the quoted evidence is verified in code to be words the student actually wrote (rubric lines pasted back are stripped before checking). A separate tutor call then asks exactly one question aimed at the first unmet point. It is forbidden to state the answer or use the give-away words; a word-level gate rejects any reply containing a give-away term and asks again. A paraphrased leak can still slip past the gate; the prompt rules are the main defence there. Once a point is met it stays met for that outcome.</li>
+    <li><b>Hints, late and small.</b> Only after two attempts at the same point may the tutor hint, and a hint points at where to look, never at what to say.</li>
+    <li><b>Understood means all points met.</b> The card flips with a one-line summary of what the student said well. After twelve turns an outcome is parked rather than dragged on.</li>
+    <li><b>Lecturer sees the gap.</b> Per outcome: share not yet met, which rubric point fails most, the misconceptions in students' own words, and the gap between felt and shown understanding (counted only for students who actually tried). Quotes carry no names, appear only once five or more sessions have attempted the week, and only for points that three or more sessions missed. Sessions are not tied to identities, so a determined lecturer could in principle inflate the count; institutional deployment should tie the threshold to authenticated students.</li>
+  </ol>
+
+  <h2>Around the loop</h2>
+  <ul>
+    <li><b>Learn mode.</b> Students can ask the AI anything and add their own material (a textbook chapter, other slides, notes). Here the AI does explain, grounded in the lecturer's and the student's material, but every explanation ends with "now say it back", and nothing said here counts: only the check does. Students can turn their own material into private practice cards. Any language.</li>
+    <li><b>Class wall.</b> Students share their own explanation of an outcome; classmates vote; the ones that made it click rise to the top. A post from someone who passed the check is marked as such. The lecturer's report shows the most-voted explanations per outcome, which is a second, student-authored view of what "understood" looks like for this class.</li>
+    <li><b>Calibration profile.</b> Per browser, no account: how sure you felt against what you could show, the outcomes you were sure about and could not explain, and a spaced re-explain that brings mastered outcomes back after a few days for a two-sentence recall.</li>
+    <li><b>Defend your own work.</b> Paste coursework; the AI writes three or four questions only its real author could answer, and the same tutor and judge run on them. Private to the student. A rehearsal for a viva, and a positive alternative to text detectors that falsely flag non-native writers.</li>
+    <li><b>Live lecture view.</b> The gap report in large type, refreshing every 15 seconds, for the projector while students practise in the first minutes of a lecture.</li>
+    <li><b>Re-teach as slides.</b> The drafted five-minute re-teach downloads as a .pptx to drop into the next lecture.</li>
+  </ul>
+
+  <h2>Why these choices</h2>
+  <ul>
+    <li><b>Explain, don't read.</b> The illusion of explanatory depth collapses when people try to produce the explanation (Rozenblit &amp; Keil, 2002). Prompted self-explanation outperforms receiving an explanation across 64 studies (Bisra et al., 2018).</li>
+    <li><b>No answers from the tutor.</b> In a 1,000-student trial, unrestricted GPT-4 cut unaided exam scores by 17%; a hint-only tutor removed the harm (Bastani et al., 2025). ChatGPT Study Mode and Google's LearnLM use the same rule; we make it a hard constraint and check it in code.</li>
+    <li><b>Confidence first.</b> AI users overestimate their performance and the gap grows with AI literacy (Fernandes et al., 2025). Asking for confidence before the attempt turns that gap into a number the student and lecturer can both see.</li>
+    <li><b>Two judges.</b> A single model's "met" is too generous. Agreement between independent calls, each required to quote evidence, keeps false positives down, the same idea as multi-grader oral exams.</li>
+    <li><b>Lecturer in the loop.</b> The rubric is the lecturer's, not the model's. The tool measures what the course wants understood, not what the AI finds interesting.</li>
+  </ul>
+
+  <h2>What it does not do</h2>
+  <ul>
+    <li>It does not grade. Nothing here feeds a mark; it is formative only.</li>
+    <li>It does not identify students to staff. Sessions carry an optional nickname that is never displayed in the report.</li>
+    <li>It does not replace the lecturer's judgement. Every outcome, rubric point and re-teach plan is editable, and the AI's judgement is shown as evidence quotes, not scores.</li>
+  </ul>
+
+  <h2>Known limits</h2>
+  <ul>
+    <li>Judges can still be wrong in both directions; the evidence quote makes a wrong "met" visible, and a stubborn "not met" ends in a parked card, not a fail.</li>
+    <li>Students can write what they think the rubric wants rather than what they believe. Because the tutor probes the student's own words and the rubric points are concrete, this is harder than it sounds, but not impossible.</li>
+    <li>Non-native speakers and students with writing-related disabilities face a higher cost per turn. Voice input is the planned mitigation; the rubric judges ideas, not grammar.</li>
+    <li>The demo uses a hosted model. An institutional deployment should run on university-hosted or contracted models (for example through the University's ELM platform) so student explanations never leave institutional control.</li>
+  </ul>
+
+  <p class="muted">Built solo for TeachAthon 2026 at the University of Edinburgh. The prompts are in <code>server/prompts.py</code> and are short enough to read.</p>
+</div>
+{% endblock %}

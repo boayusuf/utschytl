@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="wrap">
+  <section class="hero">
+    <div>
+      <h1>Explain it back. Find out what you actually understand.</h1>
+      <p class="lede">Your lecturer sets the ten or so things this week is really about. You explain each one in your own words to a tutor that never gives the answer, only asks. Your lecturer sees what the class still can't explain, not who.</p>
+      <div class="hero-actions">
+        <a class="btn btn-lg" href="/learn">Start practising</a>
+        <a class="btn btn-lg btn-secondary" href="/teach">I'm a lecturer</a>
+      </div>
+      <p class="muted" style="margin-top:1rem">Reading an AI's explanation feels like understanding. Being able to explain it yourself is understanding. This tool only counts the second one.</p>
+    </div>
+    <div class="demo-card" aria-label="Example of a practice card">
+      <div class="card-meta"><span>Outcome 3 of 10 · slides 7–9</span><span>Week 5</span></div>
+      <p class="card-prompt">Explain why we ignore constant factors when we write O(n log n), and when a programmer should not ignore them.</p>
+      <div class="demo-chat">
+        <div class="msg student">Because Big-O is about how the time grows when n gets big, so a factor of 2 doesn't change the shape.</div>
+        <div class="msg tutor">Good, "the shape" is the key idea. Now the second half: picture two sorting functions, both O(n log n), one of them 50 times slower. When would that 50 actually matter to you?</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how">
+    <div class="panel">
+      <h3>Learn first, with your own material too</h3>
+      <p>Ask the AI anything about the week; add a textbook chapter, other slides or your notes and it reads those as well. Every explanation ends with "now say it back". Turn your material into your own practice cards. Any language.</p>
+    </div>
+    <div class="panel">
+      <h3>The class explains it to each other</h3>
+      <p>Once you pass an outcome, share your explanation. Classmates vote; the ones that made it click rise to the top, and the lecturer sees which explanations the class actually found clear.</p>
+    </div>
+    <div class="panel">
+      <h3>Know what you know</h3>
+      <p>Your calibration page shows how sure you felt against what you could show, flags the outcomes you were sure about and couldn't explain, and brings explained ones back a few days later for a two-sentence recall.</p>
+    </div>
+    <div class="panel">
+      <h3>Defend your own coursework</h3>
+      <p>Paste your code or essay; the AI asks the three questions only its real author could answer. Practise before a viva, instead of being guessed at by a detector that gets non-native writers wrong 61% of the time.</p>
+    </div>
+    <div class="panel">
+      <h3>Lecturers set the target</h3>
+      <p>Drop in the week's slides. The AI drafts 8–14 learning outcomes with a short rubric each. You edit, cut and approve. Five minutes, not an hour.</p>
+    </div>
+    <div class="panel">
+      <h3>Students explain, the tutor probes</h3>
+      <p>One outcome at a time, like a big flashcard. The tutor asks one question per turn and will not state the answer. An outcome counts as understood only when two independent checks agree the student's own words meet every rubric point.</p>
+    </div>
+    <div class="panel">
+      <h3>Lecturers see the gap, not the names</h3>
+      <p>Which outcomes the class can't yet explain, which rubric point they miss, the exact wording of the misconception, and how confident students felt before they tried. A live view for the lecture theatre, and a one-click re-teach plan exported as slides.</p>
+    </div>
+  </section>
+
+  <section class="evidence">
+    <h2>Why it is built this way</h2>
+    <ul>
+      <li>Almost two-thirds of UK undergraduates now use AI to have concepts explained to them (HEPI 2026). Explanations received, not produced.</li>
+      <li>People who use an AI assistant score higher yet overestimate their own performance by about four questions in twenty, and the more AI-literate are the more overconfident (Fernandes et al., 2025).</li>
+      <li>Unrestricted GPT-4 access raised practice scores by 48% and lowered unaided exam scores by 17%. A tutor variant that gave hints but never answers removed the harm (Bastani et al., PNAS 2025).</li>
+      <li>Having to produce an explanation collapses the "illusion of explanatory depth" (Rozenblit &amp; Keil, 2002); prompting self-explanation beats being handed a good explanation across 64 studies (Bisra et al., 2018, g = 0.55).</li>
+    </ul>
+    <p><a href="/about">Full method, prompts and ethics</a></p>
+  </section>
+
+  {% if weeks %}
+  <section style="margin-top:2.5rem">
+    <h2>Open for practice now</h2>
+    <div class="week-list">
+      {% for w in weeks %}
+      <div class="week-row">
+        <div><b>{{ w.course.title }}</b>{% if w.number %} · Week {{ w.number }}{% endif %}<br><span class="muted">{{ w.title }}</span></div>
+        <form method="post" action="/learn/start" class="actions">
+          <input type="hidden" name="week_id" value="{{ w.id }}">
+          <button class="btn btn-sm" type="submit">Practise this week</button>
+        </form>
+      </div>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

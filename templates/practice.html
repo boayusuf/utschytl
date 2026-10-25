@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}{{ week.title }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap">
+  <div class="page-head">
+    <div>
+      <h1 style="font-size:1.5rem">{{ course.title }}{% if week.number %} · Week {{ week.number }}{% endif %}</h1>
+      <p class="muted">{{ week.title }}</p>
+    </div>
+    <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
+      <span class="muted" id="session-status"></span>
+      {% if week.id %}<a class="btn btn-secondary btn-sm" href="/learn/s/{{ session.id }}/learn">Learn: ask the AI, add my own material</a>{% endif %}
+      <a class="btn btn-ghost btn-sm" href="/me">My calibration</a>
+    </div>
+  </div>
+
+  <div class="practice" id="app" data-session="{{ session.id }}" data-preselect="{{ preselect or '' }}" data-recall="{{ '1' if recall else '' }}">
+    <aside class="outcome-list" aria-label="Outcomes this week">
+      <div class="progress" id="progress" aria-hidden="true"></div>
+      <ol id="outcome-nav"></ol>
+      <p class="rubric note" style="margin-top:1rem">Keyboard: ↑/↓ to move between outcomes, Ctrl+Enter to send.</p>
+    </aside>
+
+    <section aria-live="polite">
+      <div class="bigcard" id="bigcard">
+        <div class="face-front">
+          <div class="card-meta"><span id="card-pos"></span><span id="card-slide"></span></div>
+          <p class="card-prompt" id="card-prompt"></p>
+          <div class="confidence" id="confidence">
+            <p><b>Before you start:</b> how well could you explain this to a classmate right now?</p>
+            <div class="conf-scale" role="group" aria-label="Confidence from 1 to 5" id="conf-scale">
+              <button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button>
+            </div>
+            <div class="conf-labels"><span>Not at all</span><span>Completely</span></div>
+          </div>
+        </div>
+        <div class="face-back" id="face-back">
+          <span class="pill pill-teal">Understood</span>
+          <p class="card-prompt" id="back-title"></p>
+          <p id="back-summary" class="muted"></p>
+          <div><button class="btn btn-teal" id="next-btn" type="button">Next outcome</button></div>
+        </div>
+      </div>
+
+      <div id="chat-wrap" hidden>
+        <div class="chat" id="chat"></div>
+        <form class="composer" id="composer">
+          <label class="sr-only" for="input">Your explanation</label>
+          <textarea id="input" placeholder="Explain it in your own words…" required></textarea>
+          <div class="composer-row">
+            <div class="left">
+              <button class="btn" type="submit" id="send">Send</button>
+              <button class="btn btn-secondary btn-sm" type="button" id="mic" hidden aria-pressed="false" title="Explain out loud instead of typing">🎤 Speak</button>
+              <button class="btn btn-ghost btn-sm" type="button" id="skip">Skip for now</button>
+            </div>
+            <span class="honesty">The tutor will not tell you the answer. It will keep asking until you get there. Any language is fine.</span>
+          </div>
+        </form>
+      </div>
+
+      <div id="summary" hidden class="panel">
+        <h2>Session summary</h2>
+        <div class="summary-grid" id="summary-grid"></div>
+        <p id="summary-text" class="muted"></p>
+        <p><a class="btn btn-secondary" href="/learn">Start another session</a></p>
+      </div>
+    </section>
+
+    <aside class="rubric" aria-label="What is being checked and how others explain it">
+      <div class="panel">
+        <h3>What your explanation needs</h3>
+        <small class="muted">Ticks turn green as your own words cover each point.</small>
+        <ul id="rubric"></ul>
+        <p class="note" id="rubric-note"></p>
+      </div>
+      <div class="panel" style="margin-top:1rem" id="wall-panel">
+        <h3>How others explain it</h3>
+        <small class="muted">Classmates' own words, best first. Vote for the one that made it click.</small>
+        <div id="wall" style="margin-top:0.6rem"></div>
+        <form id="wallform" style="margin-top:0.6rem">
+          <textarea id="wallinput" placeholder="Share your explanation with the class…" style="min-height:64px; font-size:0.92rem" aria-label="Your explanation for the class"></textarea>
+          <div style="display:flex; gap:0.5rem; align-items:center; margin-top:0.4rem">
+            <button class="btn btn-sm btn-secondary" type="submit" id="wallbtn">Share</button>
+            <span class="hint" id="wallstatus"></span>
+          </div>
+        </form>
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{{ url_for('static', filename='practice.js') }}" defer></script>
+{% endblock %}

@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% block title %}Learn · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap" id="learn-app" data-session="{{ session.id }}">
+  <div class="page-head">
+    <div>
+      <p class="muted" style="margin:0"><a href="/learn/s/{{ session.id }}">← Back to practice</a></p>
+      <h1 style="font-size:1.5rem; margin-top:0.25rem">Learn{% if week %}: {{ week.title }}{% endif %}</h1>
+      <p class="muted">Here the AI explains. Ask anything about the lecturer's material or your own. It will keep nudging you to say it back, because that is the part that sticks. Any language is fine.</p>
+    </div>
+  </div>
+
+  <div class="editor">
+    <section>
+      <div class="chat" id="lchat" style="margin-top:0">
+        {% if not messages %}
+        <div class="msg tutor">What would you like to understand? Paste a question, a confusing slide, or just "explain binary search like I'm new to it".</div>
+        {% endif %}
+        {% for m in messages %}
+        <div class="msg {{ m.role }}">{{ m.content }}</div>
+        {% endfor %}
+      </div>
+      <form class="composer" id="lcomposer">
+        <label class="sr-only" for="linput">Your question</label>
+        <textarea id="linput" placeholder="Ask, or paste the bit you don't get…" required></textarea>
+        <div class="composer-row">
+          <div class="left">
+            <button class="btn" type="submit" id="lsend">Ask</button>
+            <a class="btn btn-ghost btn-sm" href="/learn/s/{{ session.id }}">Check me on this</a>
+          </div>
+          <span class="honesty">Explanations here count for nothing. Explaining it back on the practice page does.</span>
+        </div>
+      </form>
+    </section>
+
+    <aside>
+      <div class="panel">
+        <h3>My material</h3>
+        <small class="muted">Add a book chapter, other slides, your notes. The AI reads them alongside the lecturer's.</small>
+        <ul id="materials" style="padding-left:1.1rem; margin:0.6rem 0">
+          {% for m in materials %}<li>{{ m.title }} <span class="muted">({{ m.chars }} chars)</span></li>{% endfor %}
+        </ul>
+        <form id="matform" enctype="multipart/form-data">
+          <div class="field"><input type="file" name="file" accept=".pdf,.txt,.md" aria-label="Upload material"></div>
+          <div class="field"><textarea name="text" placeholder="…or paste text" style="min-height:70px" aria-label="Paste material"></textarea></div>
+          <button class="btn btn-secondary btn-sm" type="submit" id="matbtn">Add material</button>
+          <span class="hint" id="matstatus"></span>
+        </form>
+      </div>
+      <div class="panel" style="margin-top:1rem">
+        <h3>Make my own cards</h3>
+        <small class="muted">Turn my material into 3–6 outcomes to practise, alongside the lecturer's.</small>
+        <div class="field" style="margin-top:0.6rem"><input type="text" id="focus" placeholder="Focus (optional), e.g. 'chapter 4 only'"></div>
+        <button class="btn btn-sm" type="button" id="cardsbtn">Draft cards</button>
+        <span class="hint" id="cardsstatus"></span>
+        {% if mine %}
+        <ul style="padding-left:1.1rem; margin:0.6rem 0 0" id="mine">{% for o in mine %}<li>{{ o.title }}</li>{% endfor %}</ul>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const sid = document.getElementById('learn-app').dataset.session;
+  const $ = (id) => document.getElementById(id);
+  const chat = $('lchat');
+  function add(role, text) { const d = document.createElement('div'); d.className = 'msg ' + role; d.textContent = text; chat.appendChild(d); d.scrollIntoView({ block: 'nearest' }); return d; }
+  $('lcomposer').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const t = $('linput').value.trim(); if (!t) return;
+    add('student', t); $('linput').value = ''; $('lsend').disabled = true;
+    const w = add('tutor', '…');
+    try {
+      const r = await fetch(`/api/session/${sid}/learn`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ content: t }) });
+      const d = await r.json();
+      w.textContent = r.ok ? d.reply : ('Could not answer: ' + (d.detail || d.error));
+    } catch (err) { w.textContent = 'Could not answer: ' + err.message; }
+    $('lsend').disabled = false; $('linput').focus();
+  });
+  $('linput').addEventListener('keydown', (e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); $('lcomposer').requestSubmit(); } });
+  $('matform').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    $('matbtn').disabled = true; $('matstatus').textContent = 'Reading…';
+    const r = await fetch(`/api/session/${sid}/materials`, { method: 'POST', body: new FormData($('matform')) });
+    const d = await r.json();
+    if (r.ok) { const li = document.createElement('li'); li.textContent = d.material.title + ' (' + d.material.chars + ' chars)'; $('materials').appendChild(li); $('matform').reset(); $('matstatus').textContent = 'Added.'; }
+    else $('matstatus').textContent = d.error || r.statusText;
+    $('matbtn').disabled = false;
+  });
+  $('cardsbtn').addEventListener('click', async () => {
+    $('cardsbtn').disabled = true; $('cardsstatus').textContent = 'Drafting… 10–20 s';
+    const r = await fetch(`/api/session/${sid}/cards`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ focus: $('focus').value }) });
+    const d = await r.json();
+    if (r.ok) { $('cardsstatus').innerHTML = `${d.n} cards added. <a href="/learn/s/${sid}">Practise them</a>`; }
+    else $('cardsstatus').textContent = d.error || d.detail || r.statusText;
+    $('cardsbtn').disabled = false;
+  });
+})();
+</script>
+{% endblock %}

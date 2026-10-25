@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}Gap report · {{ APP_NAME }}{% endblock %}
+{% block head %}{% if live %}<meta http-equiv="refresh" content="15"><style>html{font-size:20px}.detail{display:none !important}.gapbar{padding:1rem 1.2rem}</style>{% endif %}{% endblock %}
+{% block content %}
+<div class="wrap" id="report" data-week="{{ week.id }}">
+  {% if live %}<div class="notice">Live view: refreshes every 15 seconds. Students practise at <b>{{ request.host_url }}learn</b>. Click any outcome for detail.</div>{% endif %}
+  <div class="page-head">
+    <div>
+      <p class="muted" style="margin:0"><a href="/teach">Your weeks</a> › {{ course.title }}{% if week.number %} · Week {{ week.number }}{% endif %}</p>
+      <h1 style="margin-top:0.25rem">What the class can't explain yet</h1>
+      <p class="muted">{{ week.title }}. Ordered by the share of students who attempted an outcome but have not yet met its rubric. No names anywhere.</p>
+    </div>
+    <div style="display:flex; gap:0.5rem; flex-wrap:wrap">
+      {% if live %}<a class="btn btn-secondary" href="?live=0">Exit live view</a>{% else %}<a class="btn btn-teal" href="?live=1" title="Big type, refreshes every 15 s: put it on the projector while students practise">Live lecture view</a>{% endif %}
+      <a class="btn btn-secondary" href="/teach/week/{{ week.id }}">Edit outcomes</a>
+    </div>
+  </div>
+
+  {% if rep.n_students == 0 %}
+  <div class="empty">No student has attempted this week yet. Share the <a href="/learn">practice link</a> and come back.</div>
+  {% else %}
+  <div class="tiles">
+    <div class="stat"><b>{{ rep.n_students }}</b><span>students attempted</span></div>
+    <div class="stat"><b>{{ rep.outcomes_secure }} / {{ rep.outcomes_total }}</b><span>outcomes understood by ≥80% of attempters</span></div>
+    <div class="stat"><b>{{ rep.n_mastered }} / {{ rep.n_attempts }}</b><span>attempts that reached "understood"</span></div>
+    <div class="stat"><b>{{ rep.overconfident_total }}</b><span>attempts rated 4–5 confidence that did not get there</span></div>
+  </div>
+
+  {% if not rep.quotes_ok %}
+  <div class="notice">Student quotes are hidden until at least {{ rep.min_students_for_quotes }} students have attempted this week ({{ rep.n_students }} so far), and a point's quotes appear only once {{ rep.k_anon }} or more students have missed it, so no individual can be recognised.</div>
+  {% endif %}
+
+  <div class="legend"><span><i style="background:var(--teal)"></i>met the rubric</span><span><i style="background:var(--amber)"></i>attempted, not yet met</span><span>Click a row for the breakdown, quotes and a re-teach plan.</span></div>
+
+  {% for r in rep.rows %}
+  <button class="gapbar" type="button" aria-expanded="false" aria-controls="d-{{ r.outcome.id }}" data-outcome="{{ r.outcome.id }}">
+    <span class="name">{{ loop.index }}. {{ r.outcome.title }}<small>{{ r.outcome.slide_ref }}{% if r.attempted %} · {{ r.attempted }} attempt{{ '' if r.attempted == 1 else 's' }}{% else %} · not attempted{% endif %}</small></span>
+    <span class="bar" aria-hidden="true">
+      {% if r.attempted %}
+      <i class="met" style="width:{{ r.mastered_pct }}%"></i><i class="gap" style="width:{{ r.gap_pct }}%"></i>
+      {% endif %}
+    </span>
+    <span class="pct">{% if r.attempted %}{{ r.gap_pct }}%<small>not yet</small>{% else %}—{% endif %}</span>
+  </button>
+  <div class="detail" id="d-{{ r.outcome.id }}" hidden>
+    <div>
+      <h4>Rubric point by point</h4>
+      {% for c in r.criteria %}
+      <div class="critline">
+        <span>{{ c.text }}</span>
+        <span class="mini" aria-hidden="true"><i style="width:{{ c.met_pct or 0 }}%"></i></span>
+        <span style="text-align:right">{% if c.met_pct is not none %}{{ c.met_pct }}%{% else %}—{% endif %}</span>
+      </div>
+      {% endfor %}
+      {% if r.avg_conf_not_mastered or r.avg_conf_mastered %}
+      <h4 style="margin-top:1rem">Felt vs shown</h4>
+      <p style="font-size:0.95rem; margin:0">Average confidence before explaining: <b>{{ r.avg_conf_not_mastered or '—' }}</b> among students who did not get there, <b>{{ r.avg_conf_mastered or '—' }}</b> among those who did.
+        {% if r.overconfident_n %}<br>{{ r.overconfident_n }} student{{ '' if r.overconfident_n == 1 else 's' }} rated themselves 4–5 and could not explain it: the illusion of understanding, measured.{% endif %}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h4>Misconceptions detected</h4>
+      {% if r.misconceptions %}
+        {% for m in r.misconceptions %}<div class="misc"><span>{{ m.text }}</span><span class="muted">{{ m.n }}</span></div>{% endfor %}
+      {% else %}<p class="muted" style="font-size:0.95rem">None recorded yet.</p>{% endif %}
+      {% if r.hardest_criterion and r.hardest_criterion.quotes %}
+      <h4 style="margin-top:1rem">In their words (hardest point: “{{ r.hardest_criterion.text }}”)</h4>
+      {% for q in r.hardest_criterion.quotes %}<blockquote class="quote">“{{ q }}”</blockquote>{% endfor %}
+      {% elif not rep.quotes_ok %}
+      <p class="muted" style="font-size:0.95rem; margin-top:1rem">Quotes unlock at {{ rep.min_students_for_quotes }} students.</p>
+      {% elif r.attempted %}
+      <p class="muted" style="font-size:0.95rem; margin-top:1rem">Quotes appear once {{ rep.k_anon }} or more students have missed the same point.</p>
+      {% endif %}
+    </div>
+    {% if wall.get(r.outcome.id) %}
+    <div style="grid-column: 1 / -1">
+      <h4>How students explain it to each other (most voted)</h4>
+      {% for p in wall[r.outcome.id] %}<blockquote class="quote" style="font-style:normal">“{{ p.content }}” <span class="muted">· ▲{{ p.up }} ▼{{ p.down }}{% if p.verified %} · passed the check{% endif %}</span></blockquote>{% endfor %}
+    </div>
+    {% endif %}
+    <div class="reteach">
+      <button class="btn btn-sm btn-secondary" type="button" data-reteach="{{ r.outcome.id }}">Draft a five-minute re-teach</button>
+      <a class="btn btn-sm btn-ghost" href="/api/week/{{ week.id }}/reteach/{{ r.outcome.id }}.pptx">Download as slides (.pptx)</a>
+      <div class="md" id="rt-{{ r.outcome.id }}" hidden style="margin-top:0.75rem"></div>
+    </div>
+  </div>
+  {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const weekId = document.getElementById('report').dataset.week;
+  document.querySelectorAll('.gapbar').forEach(b => {
+    b.addEventListener('click', () => {
+      const open = b.getAttribute('aria-expanded') === 'true';
+      b.setAttribute('aria-expanded', String(!open));
+      document.getElementById(b.getAttribute('aria-controls')).hidden = open;
+    });
+  });
+  function md(s) {
+    const esc = x => x.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+    const lines = esc(s).split('\n'); let out = '', inList = false;
+    for (const raw of lines) {
+      const l = raw.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
+      if (/^\s*[-*] /.test(l)) { if (!inList) { out += '<ul>'; inList = true; } out += '<li>' + l.replace(/^\s*[-*] /, '') + '</li>'; }
+      else { if (inList) { out += '</ul>'; inList = false; } if (l.trim()) out += '<p>' + l + '</p>'; }
+    }
+    if (inList) out += '</ul>';
+    return out;
+  }
+  document.querySelectorAll('[data-reteach]').forEach(b => {
+    b.addEventListener('click', async () => {
+      const box = document.getElementById('rt-' + b.dataset.reteach);
+      box.hidden = false; box.innerHTML = '<span class="muted">Drafting…</span>'; b.disabled = true;
+      try {
+        const r = await fetch(`/api/week/${weekId}/reteach/${b.dataset.reteach}`, { method: 'POST' });
+        const d = await r.json();
+        box.innerHTML = r.ok ? md(d.markdown) : '<span class="muted">Could not draft: ' + (d.error || r.statusText) + '</span>';
+      } catch (e) { box.innerHTML = '<span class="muted">Could not draft: ' + e.message + '</span>'; }
+      b.disabled = false;
+    });
+  });
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Lecturer sign-in · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>Lecturer area</h1>
+  <p class="muted">Demo sign-in. In a real deployment this is replaced by the university's single sign-on.</p>
+  {% if error %}<div class="error">{{ error }}</div>{% endif %}
+  <form method="post" class="panel" style="max-width:420px">
+    <div class="field">
+      <label for="pin">PIN</label>
+      <input id="pin" name="pin" type="password" inputmode="numeric" autocomplete="off" required>
+      <p class="hint">For the TeachAthon judges the PIN is in the submission report.</p>
+    </div>
+    <button class="btn" type="submit">Sign in</button>
+  </form>
+</div>
+{% endblock %}

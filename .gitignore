@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+.env.local
+data/store.json
+data/store.tmp
+.vercel
+node_modules/
+tests/screens/
+tests/video/
+tests/demo.webm

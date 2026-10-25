@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}My calibration · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <h1>How well do you know what you know?</h1>
+  <p class="lede">This page is only in this browser. It compares how sure you felt before each outcome with whether you could actually explain it.</p>
+
+  {% if not prof.total %}
+  <div class="empty">Nothing yet. <a href="/learn">Practise a week</a> and come back; the picture builds from your second outcome onwards.</div>
+  {% else %}
+  <div class="tiles">
+    <div class="stat"><b>{{ prof.total }}</b><span>outcomes attempted</span></div>
+    <div class="stat"><b>{% if prof.gap is not none %}{{ '%+.0f' % (prof.gap * 100) }}%{% else %}—{% endif %}</b><span>felt minus shown{% if prof.gap is not none %}{% if prof.gap > 0.15 %} · you feel surer than you can show{% elif prof.gap < -0.15 %} · you know more than you think{% else %} · well calibrated{% endif %}{% endif %}</span></div>
+    <div class="stat"><b>{{ prof.due | length }}</b><span>due for a quick re-explain</span></div>
+  </div>
+
+  <div class="panel">
+    <h3>Felt vs shown</h3>
+    <small class="muted">For each confidence you gave (1–5), the share of those outcomes you then explained fully. A calibrated learner's bars rise steadily from left to right.</small>
+    <svg viewBox="0 0 520 190" width="100%" role="img" aria-label="Bar chart of confidence rating against share explained" style="margin-top:0.75rem; max-width:560px">
+      <line x1="40" y1="150" x2="510" y2="150" stroke="#b9c2bd"/>
+      {% for b in prof.calibration %}
+      {% set x = 60 + loop.index0 * 90 %}
+      {% set h = (b.shown_pct or 0) * 1.2 %}
+      <rect x="{{ x }}" y="{{ 150 - h }}" width="50" height="{{ h }}" fill="{{ '#0e7c66' if b.n else '#d9dfdc' }}" rx="4"/>
+      <text x="{{ x + 25 }}" y="168" text-anchor="middle" font-size="13" fill="#16202a">{{ b.confidence }}</text>
+      <text x="{{ x + 25 }}" y="{{ 144 - h }}" text-anchor="middle" font-size="12" fill="#3b4653">{% if b.n %}{{ b.shown_pct }}% · n={{ b.n }}{% else %}–{% endif %}</text>
+      {% endfor %}
+      <text x="275" y="186" text-anchor="middle" font-size="12" fill="#6b7785">confidence you gave before explaining</text>
+      <text x="12" y="30" font-size="12" fill="#6b7785">% explained</text>
+    </svg>
+  </div>
+
+  {% if prof.overconfident %}
+  <div class="panel" style="margin-top:1rem">
+    <h3>Felt sure, couldn't show</h3>
+    <small class="muted">You rated these 4 or 5 and did not get there. These are the ones worth your next hour.</small>
+    <ul style="margin:0.6rem 0 0; padding-left:1.1rem">
+      {% for o in prof.overconfident %}
+      <li><a href="/learn/s/{{ o.session_id }}?outcome={{ o.outcome.id }}">{{ o.outcome.title }}</a> <span class="muted">· {{ o.week.title }} · rated {{ o.confidence }}</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if prof.due %}
+  <div class="panel" style="margin-top:1rem">
+    <h3>Due for a quick re-explain</h3>
+    <small class="muted">You explained these a few days ago. Two or three sentences from memory keeps them; re-reading does not.</small>
+    <ul style="margin:0.6rem 0 0; padding-left:1.1rem">
+      {% for d in prof.due %}
+      <li><a href="/learn/s/{{ d.session_id }}?outcome={{ d.outcome.id }}&recall=1">{{ d.outcome.title }}</a> <span class="muted">· {{ d.days }} days ago</span></li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  <div class="panel" style="margin-top:1rem">
+    <h3>By week</h3>
+    {% for r in prof.weeks %}
+    <div class="misc"><span>{{ r.course.title if r.course else '' }}{% if r.week.number %} · Week {{ r.week.number }}{% endif %} · {{ r.week.title }}</span><span class="muted">{{ r.mastered }}/{{ r.attempted }} understood{% if r.overconfident %} · {{ r.overconfident }} overconfident{% endif %}</span></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
