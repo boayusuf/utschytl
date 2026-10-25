@@ -215,40 +215,41 @@ def _plan(profile: str, i: int):
 
 
 def seed(reset: bool = False) -> dict:
+    """Idempotent: if the demo week exists it is deleted (cascade) and rebuilt. Bulk inserts so it
+    finishes in a few seconds against Supabase (a Vercel function has 60 s)."""
     s = get_store()
     if reset:
         s.reset()
     course = next((c for c in s.list("courses") if c["title"] == COURSE["title"]), None) or s.insert("courses", COURSE)
-    already = [w for w in s.list("weeks", course_id=course["id"]) if w.get("title") == WEEK["title"]]
-    if already and not reset:
-        return {"course": course["id"], "week": already[0]["id"], "students": 0, "attempts": 0, "posts": 0, "skipped": True}
-    week = s.insert("weeks", {**WEEK, "course_id": course["id"], "status": "published", "material_chars": 18450,
-                              "material_excerpt": "[slide 1] Informatics 1 — Week 5: Asymptotic complexity ..."})
+    for w in s.list("weeks", course_id=course["id"]):
+        if w.get("title") == WEEK["title"]:
+            s.delete("weeks", w["id"])  # cascades to outcomes, sessions, attempts, turns, posts, votes
+
+    week = {"id": new_id(), **WEEK, "course_id": course["id"], "status": "published", "material_chars": 18450,
+            "material_excerpt": "[slide 1] Informatics 1 — Week 5: Asymptotic complexity ..."}
     outcome_rows = []
     for pos, (title, prompt, slide_ref, crits, miscs) in enumerate(OUTCOMES):
         criteria = [{"id": new_id()[:8], "text": t, "student_label": STUDENT_LABELS.get(t, ""), "answer_terms": terms} for t, terms in crits]
-        outcome_rows.append(
-            s.insert("outcomes", {"week_id": week["id"], "position": pos, "title": title, "prompt": prompt,
-                                  "slide_ref": slide_ref, "criteria": criteria, "common_misconceptions": miscs})
-        )
+        outcome_rows.append({"id": new_id(), "week_id": week["id"], "position": pos, "title": title, "prompt": prompt,
+                             "slide_ref": slide_ref, "criteria": criteria, "common_misconceptions": miscs, "kind": "week"})
 
     base = datetime.now(timezone.utc) - timedelta(days=3)
-    n_attempts = 0
+    ids = {alias: new_id() for alias, _ in STUDENTS}
+    sessions, attempts, turns_rows = [], [], []
     for si, (alias, profile) in enumerate(STUDENTS):
-        sess = s.insert("sessions", {"week_id": week["id"], "alias": alias, "created_at": (base + timedelta(hours=si * 5)).isoformat()})
+        sess = {"id": new_id(), "week_id": week["id"], "alias": alias, "student_id": ids[alias],
+                "created_at": (base + timedelta(hours=si * 5)).isoformat()}
+        sessions.append(sess)
         how_many = len(OUTCOMES) if profile in ("strong", "mid") else RNG.randint(5, 8)
         for i, o in enumerate(outcome_rows[:how_many]):
             conf, kind = _plan(profile, i)
             full, partial, wrong = TEXT[i]
             t0 = base + timedelta(hours=si * 5, minutes=i * 6)
-            att = s.insert("attempts", {"session_id": sess["id"], "outcome_id": o["id"], "confidence_before": conf,
-                                        "status": "in_progress", "student_turns": 0, "target_attempts": 0,
-                                        "target_id": None, "met_ids": [], "misconceptions": [], "created_at": t0.isoformat()})
-            turns = [("tutor", prompts.TUTOR_OPENER, None)]
             crit_ids = [c["id"] for c in o["criteria"]]
+            turns = [("tutor", prompts.TUTOR_OPENER, None)]
             if kind == "full":
                 turns += [("student", partial, None), ("tutor", "Good start. What is it NOT telling you, and what gets left out on purpose?", None),
-                          ("student", full, None), ("tutor", f"You covered every part of this in your own words. Marked as understood.", None)]
+                          ("student", full, None), ("tutor", "You covered every part of this in your own words. Marked as understood.", None)]
                 met, status, misc, st = crit_ids, "mastered", [], 2
             elif kind == "partial":
                 turns += [("student", partial, None), ("tutor", "You have the first half. Can you give me a concrete case where the rest would show up?", None),
@@ -264,13 +265,15 @@ def seed(reset: bool = False) -> dict:
                 turns += [("student", "honestly no idea, can you just tell me", None),
                           ("tutor", "I won't give it away, but let's make it smaller: what is the one word in the prompt you could explain to a friend?", None)]
                 met, status, misc, st = [], "skipped", [], 1
+            att = {"id": new_id(), "session_id": sess["id"], "outcome_id": o["id"], "confidence_before": conf, "status": status,
+                   "student_turns": st, "target_attempts": st, "target_id": next((c for c in crit_ids if c not in met), None),
+                   "met_ids": met, "misconceptions": misc, "kind": "practice", "created_at": t0.isoformat(),
+                   "mastered_at": (t0 + timedelta(minutes=4)).isoformat() if status == "mastered" else None}
+            attempts.append(att)
             for k, (role, content, meta) in enumerate(turns):
-                s.insert("turns", {"attempt_id": att["id"], "role": role, "content": content, "judge": None, "meta": meta,
+                turns_rows.append({"id": new_id(), "attempt_id": att["id"], "role": role, "content": content, "judge": None, "meta": meta,
                                    "created_at": (t0 + timedelta(seconds=40 * k)).isoformat()})
-            s.update("attempts", att["id"], {"status": status, "met_ids": met, "misconceptions": misc, "student_turns": st,
-                                             "target_id": next((c for c in crit_ids if c not in met), None), "target_attempts": st})
-            n_attempts += 1
-    # class wall: a few shared explanations with votes on the first outcomes
+
     POSTS = [
         (0, "owl42", True, "Big-O = how the work grows as the input grows. Not seconds, not the exact count: the shape of the curve for huge inputs, with constants and small terms thrown away."),
         (0, "mara_k", True, "Think of it as 'if I 10x the input, roughly what happens to the time?' O(n) → 10x. O(n²) → 100x. That's all it promises."),
@@ -279,28 +282,30 @@ def seed(reset: bool = False) -> dict:
         (4, "nabila", False, "It only looks at half the elements so it's faster, that's why it's log."),
         (3, "owl42", True, "Inner loop runs fully for EVERY outer step, so you multiply: n·n. Two loops one after another you add: n+n, still O(n). Nested = multiply, sequential = add."),
     ]
-    sess_by_alias = {}
-    for alias, _ in STUDENTS:
-        ss = [x for x in s.list("sessions", week_id=week["id"]) if x.get("alias") == alias]
-        if ss:
-            sess_by_alias[alias] = ss[0]
-    ids = {alias: new_id() for alias, _ in STUDENTS}
+    sess_by_alias = {x["alias"]: x for x in sessions}
+    posts, votes = [], []
     for oi, alias, verified, text in POSTS:
-        sess = sess_by_alias.get(alias)
-        if not sess:
-            continue
-        s.update("sessions", sess["id"], {"student_id": ids[alias]})
-        post = s.insert("posts", {"session_id": sess["id"], "student_id": ids[alias], "week_id": week["id"], "outcome_id": outcome_rows[oi]["id"],
-                                  "alias": alias, "content": text, "verified": verified})
+        sess = sess_by_alias[alias]
+        post = {"id": new_id(), "session_id": sess["id"], "student_id": ids[alias], "week_id": week["id"], "outcome_id": outcome_rows[oi]["id"],
+                "alias": alias, "content": text, "verified": verified}
+        posts.append(post)
         voters = [a for a, _ in STUDENTS if a != alias]
         RNG.shuffle(voters)
         n_up = RNG.randint(4, 7) if verified else RNG.randint(0, 1)
         n_down = RNG.randint(0, 1) if verified else RNG.randint(2, 4)
         for v in voters[:n_up]:
-            s.insert("votes", {"post_id": post["id"], "student_id": ids[v], "value": 1})
+            votes.append({"post_id": post["id"], "student_id": ids[v], "value": 1})
         for v in voters[n_up:n_up + n_down]:
-            s.insert("votes", {"post_id": post["id"], "student_id": ids[v], "value": -1})
-    return {"course": course["id"], "week": week["id"], "students": len(STUDENTS), "attempts": n_attempts, "posts": len(POSTS)}
+            votes.append({"post_id": post["id"], "student_id": ids[v], "value": -1})
+
+    s.insert_many("weeks", [week])
+    s.insert_many("outcomes", outcome_rows)
+    s.insert_many("sessions", sessions)
+    s.insert_many("attempts", attempts)
+    s.insert_many("turns", turns_rows)
+    s.insert_many("posts", posts)
+    s.insert_many("votes", votes)
+    return {"course": course["id"], "week": week["id"], "students": len(STUDENTS), "attempts": len(attempts), "posts": len(posts)}
 
 
 if __name__ == "__main__":

@@ -67,6 +67,38 @@ class JsonStore:
             self._flush()
             return row
 
+    def insert_many(self, table: str, rows: list[dict]) -> list[dict]:
+        with self._lock:
+            out = []
+            for row in rows:
+                row = dict(row)
+                row.setdefault("id", new_id())
+                row.setdefault("created_at", now_iso())
+                self._data[table].append(row)
+                out.append(row)
+            self._flush()
+            return out
+
+    # child table -> (foreign key column, parent table); mirrors the ON DELETE CASCADE rules in sql/schema.sql
+    _CASCADE = {
+        "weeks": [("outcomes", "week_id"), ("sessions", "week_id"), ("posts", "week_id")],
+        "sessions": [("attempts", "session_id"), ("materials", "session_id"), ("chats", "session_id"), ("posts", "session_id"), ("outcomes", "session_id")],
+        "outcomes": [("attempts", "outcome_id"), ("posts", "outcome_id")],
+        "attempts": [("turns", "attempt_id")],
+        "posts": [("votes", "post_id")],
+    }
+
+    def delete(self, table: str, id: str) -> None:
+        with self._lock:
+            self._delete_rec(table, id)
+            self._flush()
+
+    def _delete_rec(self, table: str, id: str) -> None:
+        for child, fk in self._CASCADE.get(table, []):
+            for r in [r for r in self._data[child] if r.get(fk) == id]:
+                self._delete_rec(child, r["id"])
+        self._data[table] = [r for r in self._data[table] if r["id"] != id]
+
     def update(self, table: str, id: str, patch: dict) -> dict | None:
         with self._lock:
             for row in self._data[table]:
@@ -123,6 +155,18 @@ class SupabaseStore:
         row.setdefault("created_at", now_iso())
         out = self._req("POST", table, json_body=row, prefer="return=representation")
         return out[0] if isinstance(out, list) else row
+
+    def insert_many(self, table: str, rows: list[dict]) -> list[dict]:
+        rows = [dict(r) for r in rows]
+        for r in rows:
+            r.setdefault("id", new_id())
+            r.setdefault("created_at", now_iso())
+        for i in range(0, len(rows), 500):
+            self._req("POST", table, json_body=rows[i : i + 500], prefer="return=minimal")
+        return rows
+
+    def delete(self, table: str, id: str) -> None:
+        self._req("DELETE", table, params={"id": f"eq.{id}"})
 
     def update(self, table: str, id: str, patch: dict) -> dict | None:
         out = self._req("PATCH", table, params={"id": f"eq.{id}"}, json_body=patch, prefer="return=representation")
