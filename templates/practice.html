@@ -9,7 +9,8 @@
     </div>
     <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap">
       <span class="muted" id="session-status"></span>
-      {% if week.id %}<a class="btn btn-secondary btn-sm" href="/learn/s/{{ session.id }}/learn">Learn: ask the AI, add my own material</a>{% endif %}
+      {% if week.id %}<a class="btn btn-secondary btn-sm" href="/learn/s/{{ session.id }}/learn">Learn: ask the AI, add my own material</a>
+      <a class="btn btn-secondary btn-sm" href="/w/{{ week.id }}/questions?back=/learn/s/{{ session.id }}">Questions{% if open_q %} ({{ open_q }} open){% endif %}</a>{% endif %}
       <a class="btn btn-ghost btn-sm" href="/me">My calibration</a>
     </div>
   </div>
@@ -26,13 +27,7 @@
         <div class="face-front">
           <div class="card-meta"><span id="card-pos"></span><span id="card-slide"></span></div>
           <p class="card-prompt" id="card-prompt"></p>
-          <div class="confidence" id="confidence">
-            <p><b>Before you start:</b> how well could you explain this to a classmate right now?</p>
-            <div class="conf-scale" role="group" aria-label="Confidence from 1 to 5" id="conf-scale">
-              <button type="button" data-v="1">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5">5</button>
-            </div>
-            <div class="conf-labels"><span>Not at all</span><span>Completely</span></div>
-          </div>
+
         </div>
         <div class="face-back" id="face-back">
           <span class="pill pill-teal">Understood</span>
@@ -46,6 +41,12 @@
         <div class="chat" id="chat"></div>
         <form class="composer" id="composer">
           <label class="sr-only" for="input">Your explanation</label>
+          <div class="conf-inline" id="confidence">
+            <span class="muted">How sure are you, before you try? <span class="muted" style="font-size:0.8rem">(optional)</span></span>
+            <div class="conf-scale conf-mini" role="group" aria-label="Confidence from 1 to 5" id="conf-scale">
+              <button type="button" data-v="1" title="Not at all">1</button><button type="button" data-v="2">2</button><button type="button" data-v="3">3</button><button type="button" data-v="4">4</button><button type="button" data-v="5" title="Completely">5</button>
+            </div>
+          </div>
           <textarea id="input" placeholder="Explain it in your own words…" required></textarea>
           <div class="composer-row">
             <div class="left">

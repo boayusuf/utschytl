@@ -316,7 +316,7 @@ def start_attempt(session_id: str, outcome_id: str, confidence_before: int, kind
         {
             "session_id": session_id,
             "outcome_id": outcome_id,
-            "confidence_before": confidence_before,
+            "confidence_before": confidence_before or None,
             "status": "in_progress",
             "student_turns": 0,
             "target_attempts": 0,
@@ -751,7 +751,7 @@ def post_explanation(session_id: str, outcome_id: str, content: str, student_id:
 
 def vote_post(post_id: str, student_id: str, value: int) -> dict:
     s = get_store()
-    if not s.get("posts", post_id):
+    if not (s.get("posts", post_id) or s.get("threads", post_id) or s.get("replies", post_id)):
         raise KeyError("post not found")
     value = 1 if value > 0 else (-1 if value < 0 else 0)
     existing = [v for v in s.list("votes", post_id=post_id) if v.get("student_id") == student_id]
@@ -835,3 +835,113 @@ def student_profile(student_id: str) -> dict:
         "gap": gap,
         "total": total,
     }
+
+
+# --------------------------------------------------------------------------
+# 9. Q&A forum (Ed-style): questions per week, replies, lecturer answers, votes
+# --------------------------------------------------------------------------
+def _score(votes: list[dict], student_id: str | None):
+    return sum(int(v.get("value", 0)) for v in votes), next((int(v.get("value", 0)) for v in votes if student_id and v.get("student_id") == student_id), 0)
+
+
+def forum_list(week_id: str, student_id: str | None) -> list[dict]:
+    s = get_store()
+    threads = s.list("threads", week_id=week_id)
+    if not threads:
+        return []
+    tids = [t["id"] for t in threads]
+    replies = s.list("replies", thread_id=tids)
+    votes = s.list("votes", post_id=tids)
+    by_t: dict[str, list[dict]] = defaultdict(list)
+    for v in votes:
+        by_t[v["post_id"]].append(v)
+    nrep = Counter(r["thread_id"] for r in replies)
+    lect = {r["thread_id"] for r in replies if r.get("role") == "lecturer"}
+    out = []
+    for t in threads:
+        score, mine = _score(by_t.get(t["id"], []), student_id)
+        out.append({**t, "score": score, "my_vote": mine, "n_replies": nrep.get(t["id"], 0), "lecturer_replied": t["id"] in lect})
+    out.sort(key=lambda x: (not x.get("pinned"), x.get("answered") or False, -x["score"], x.get("created_at") or ""), reverse=False)
+    return out
+
+
+def forum_thread(thread_id: str, student_id: str | None) -> dict | None:
+    s = get_store()
+    t = s.get("threads", thread_id)
+    if not t:
+        return None
+    replies = s.list("replies", thread_id=thread_id)
+    ids = [thread_id] + [r["id"] for r in replies]
+    votes = s.list("votes", post_id=ids)
+    by: dict[str, list[dict]] = defaultdict(list)
+    for v in votes:
+        by[v["post_id"]].append(v)
+    score, mine = _score(by.get(thread_id, []), student_id)
+    reps = []
+    for r in replies:
+        sc, mv = _score(by.get(r["id"], []), student_id)
+        reps.append({**r, "score": sc, "my_vote": mv})
+    reps.sort(key=lambda r: (not r.get("accepted"), r.get("role") != "lecturer", -r["score"], r.get("created_at") or ""))
+    return {**t, "score": score, "my_vote": mine, "replies": reps}
+
+
+def forum_ask(week_id: str, student_id: str | None, alias: str, title: str, body: str, role: str = "student") -> dict:
+    s = get_store()
+    if not s.get("weeks", week_id):
+        raise KeyError("week not found")
+    title = title.strip()[:160]
+    if len(title) < 5:
+        raise ValueError("Give the question a title.")
+    return s.insert("threads", {"week_id": week_id, "student_id": student_id, "alias": alias or "a student", "role": role,
+                                "title": title, "body": body.strip()[:4000], "answered": False, "pinned": False, "ai_draft": None, "ai_confirmed": False})
+
+
+def forum_reply(thread_id: str, student_id: str | None, alias: str, body: str, role: str = "student") -> dict:
+    s = get_store()
+    if not s.get("threads", thread_id):
+        raise KeyError("thread not found")
+    body = body.strip()[:4000]
+    if len(body) < 2:
+        raise ValueError("Write something.")
+    return s.insert("replies", {"thread_id": thread_id, "student_id": student_id, "alias": alias or ("Lecturer" if role == "lecturer" else "a student"),
+                                "role": role, "body": body, "accepted": False})
+
+
+def forum_ai_draft(thread_id: str) -> str:
+    s = get_store()
+    t = s.get("threads", thread_id)
+    if not t:
+        raise KeyError("thread not found")
+    if t.get("ai_draft"):
+        return t["ai_draft"]
+    week = s.get("weeks", t["week_id"]) or {}
+    material = week.get("material_excerpt") or "(no material)"
+    draft = llm.complete_text(
+        prompts.FORUM_SYSTEM.format(material=material),
+        prompts.FORUM_USER.format(title=t["title"], body=t.get("body") or ""),
+        temperature=0.4,
+        mock=f"First take: the short answer to \"{t['title']}\" is in the week's material around slide 3; the key idea is to connect it to one concrete case. Check yourself: can you say in one sentence why it holds?",
+    )
+    s.update("threads", thread_id, {"ai_draft": draft})
+    return draft
+
+
+def forum_set(thread_id: str, patch: dict) -> dict | None:
+    allowed = {k: v for k, v in patch.items() if k in ("answered", "pinned", "ai_confirmed")}
+    return get_store().update("threads", thread_id, allowed)
+
+
+def forum_accept(reply_id: str) -> None:
+    s = get_store()
+    r = s.get("replies", reply_id)
+    if not r:
+        raise KeyError("reply not found")
+    for other in s.list("replies", thread_id=r["thread_id"]):
+        if other.get("accepted"):
+            s.update("replies", other["id"], {"accepted": False})
+    s.update("replies", reply_id, {"accepted": True})
+    s.update("threads", r["thread_id"], {"answered": True})
+
+
+def forum_open_count(week_id: str) -> int:
+    return sum(1 for t in get_store().list("threads", week_id=week_id) if not t.get("answered"))

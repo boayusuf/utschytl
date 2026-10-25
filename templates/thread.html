@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}{{ t.title }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow" id="thread" data-id="{{ t.id }}">
+  <p class="muted" style="margin:0"><a href="/w/{{ week.id }}/questions">← All questions</a> · {{ course.title }}{% if week.number %} · Week {{ week.number }}{% endif %}</p>
+  <div class="panel" style="margin-top:0.75rem">
+    <h1 style="font-size:1.4rem">{{ t.title }}</h1>
+    {% if t.body %}<p style="white-space:pre-wrap">{{ t.body }}</p>{% endif %}
+    <div class="meta" style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; color:var(--slate); font-size:0.9rem">
+      <span>{{ t.alias }}{% if t.role == 'lecturer' %} (lecturer){% endif %}</span>
+      <button class="vote" data-vote="{{ t.id }}" data-v="1" aria-pressed="{{ 'true' if t.my_vote > 0 else 'false' }}">▲ {{ t.score }}</button>
+      {% if t.answered %}<span class="pill pill-teal">Answered</span>{% endif %}
+      {% if lecturer %}
+      <button class="btn btn-sm btn-ghost" data-set="pinned" data-val="{{ 'false' if t.pinned else 'true' }}">{{ 'Unpin' if t.pinned else 'Pin' }}</button>
+      <button class="btn btn-sm btn-ghost" data-set="answered" data-val="{{ 'false' if t.answered else 'true' }}">{{ 'Mark unanswered' if t.answered else 'Mark answered' }}</button>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:0.75rem; background:var(--tutor)" id="aibox">
+    {% if t.ai_draft %}
+      <div style="display:flex; gap:0.5rem; align-items:center; flex-wrap:wrap"><b>AI first take</b>{% if t.ai_confirmed %}<span class="pill pill-teal">confirmed by the lecturer</span>{% else %}<span class="pill pill-amber">not yet checked by the lecturer</span>{% endif %}
+      {% if lecturer and not t.ai_confirmed %}<button class="btn btn-sm btn-secondary" data-set="ai_confirmed" data-val="true">Confirm</button>{% endif %}</div>
+      <p style="white-space:pre-wrap; margin:0.5rem 0 0" id="aitext">{{ t.ai_draft }}</p>
+    {% else %}
+      <div style="display:flex; gap:0.75rem; align-items:center; flex-wrap:wrap"><span class="muted">No one has answered yet?</span><button class="btn btn-sm btn-secondary" id="aibtn">Ask the AI for a first take</button><span class="hint" id="aistatus"></span></div>
+    {% endif %}
+  </div>
+
+  <h2 style="margin-top:1.5rem">{{ t.replies | length }} repl{{ 'y' if t.replies | length == 1 else 'ies' }}</h2>
+  {% for r in t.replies %}
+  <div class="panel" style="margin-top:0.5rem; {% if r.accepted %}border-color:var(--teal); background:var(--teal-soft){% elif r.role == 'lecturer' %}border-color:var(--ink){% endif %}">
+    <p style="white-space:pre-wrap; margin:0 0 0.5rem">{{ r.body }}</p>
+    <div style="display:flex; gap:0.6rem; align-items:center; flex-wrap:wrap; color:var(--slate); font-size:0.9rem">
+      <span>{{ r.alias }}{% if r.role == 'lecturer' %} <span class="pill">Lecturer</span>{% endif %}</span>
+      {% if r.accepted %}<span class="pill pill-teal">Accepted answer</span>{% endif %}
+      <button class="vote" data-vote="{{ r.id }}" data-v="1" aria-pressed="{{ 'true' if r.my_vote > 0 else 'false' }}">▲ {{ r.score }}</button>
+      {% if lecturer and not r.accepted %}<button class="btn btn-sm btn-ghost" data-accept="{{ r.id }}">Accept as answer</button>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+
+  <form method="post" action="/q/{{ t.id }}/reply" class="panel" style="margin-top:1rem">
+    <div class="field"><label for="body">Your reply</label><textarea id="body" name="body" required style="min-height:90px"></textarea></div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field" style="flex:0 1 220px"><label for="alias">Name or nickname</label><input id="alias" name="alias" type="text" maxlength="24" placeholder="{{ 'Lecturer' if lecturer else 'optional' }}"></div>
+      <div class="field" style="flex:0 0 auto"><button class="btn" type="submit">{{ 'Reply as lecturer' if lecturer else 'Reply' }}</button></div>
+    </div>
+  </form>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  const id = document.getElementById('thread').dataset.id;
+  const post = (u, b) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) });
+  document.querySelectorAll('[data-vote]').forEach(b => b.addEventListener('click', async () => {
+    const on = b.getAttribute('aria-pressed') === 'true';
+    await post(`/api/post/${b.dataset.vote}/vote`, { value: on ? 0 : 1 });
+    location.reload();
+  }));
+  document.querySelectorAll('[data-set]').forEach(b => b.addEventListener('click', async () => {
+    await post(`/api/thread/${id}/set`, { [b.dataset.set]: b.dataset.val === 'true' });
+    location.reload();
+  }));
+  document.querySelectorAll('[data-accept]').forEach(b => b.addEventListener('click', async () => {
+    await post(`/api/reply/${b.dataset.accept}/accept`);
+    location.reload();
+  }));
+  const ai = document.getElementById('aibtn');
+  if (ai) ai.addEventListener('click', async () => {
+    ai.disabled = true; document.getElementById('aistatus').textContent = 'Thinking…';
+    const r = await post(`/api/thread/${id}/ai`);
+    if (r.ok) location.reload(); else { document.getElementById('aistatus').textContent = 'Could not draft.'; ai.disabled = false; }
+  });
+})();
+</script>
+{% endblock %}

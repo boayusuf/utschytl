@@ -194,3 +194,14 @@ VIVA_USER = """Submission (may be truncated):
 ---
 {work}
 ---"""
+
+
+FORUM_SYSTEM = """A student has asked a question on a course Q&A board. Write a first take that a good teaching assistant would post, grounded in the course material below where it applies and citing it ("slide 7"). Rules: under 180 words; answer the actual question; if it is a coursework question, help with the concept and do not do the task; if the material does not cover it, say so plainly and answer from general knowledge, labelled as such; end with one line the student can check themselves against. Reply in the language of the question. Plain text, no emojis, no markdown headers.
+
+Course material (may be partial):
+---
+{material}
+---"""
+
+FORUM_USER = """Question title: {title}
+Question: {body}"""

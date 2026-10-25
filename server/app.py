@@ -82,7 +82,7 @@ def _runtime_error(e):
 
 
 # Tiny per-IP rate limit for the AI endpoints (per instance; enough to stop casual abuse of a demo key).
-_hits: dict[str, deque] = defaultdict(deque)
+_hits: dict[tuple, deque] = defaultdict(deque)
 _hits_lock = threading.Lock()
 
 
@@ -93,7 +93,7 @@ def rate_limited(max_per_minute: int):
             ip = request.headers.get("x-forwarded-for", request.remote_addr or "?").split(",")[0].strip()
             now = time.time()
             with _hits_lock:
-                q = _hits[ip]
+                q = _hits[(ip, fn.__name__)]
                 while q and q[0] < now - 60:
                     q.popleft()
                 if len(q) >= max_per_minute:
@@ -228,8 +228,9 @@ def practice(session_id):
     if not week:
         week = {"id": None, "title": "Defend your own work", "number": None}
         course = {"title": "My coursework"}
+    open_q = logic.forum_open_count(week["id"]) if week.get("id") else 0
     return render_template("practice.html", session=sess, week=week, course=course, preselect=request.args.get("outcome"),
-                           recall=request.args.get("recall") == "1")
+                           recall=request.args.get("recall") == "1", open_q=open_q)
 
 
 @app.get("/api/session/<session_id>")
@@ -282,8 +283,8 @@ def api_attempt_start():
         conf = int(body.get("confidence") or 0)
     except (TypeError, ValueError):
         conf = 0
-    if conf not in (1, 2, 3, 4, 5):
-        return jsonify({"error": "confidence must be 1-5"}), 400
+    if conf not in (0, 1, 2, 3, 4, 5):
+        return jsonify({"error": "confidence must be 1-5 or 0 for 'not given'"}), 400
     kind = "recall" if body.get("kind") == "recall" else "practice"
     try:
         a = logic.start_attempt(str(body.get("session_id", "")), str(body.get("outcome_id", "")), conf, kind=kind)
@@ -331,6 +332,26 @@ def api_attempt_message(attempt_id):
             "student_turns": res["student_turns"],
         }
     )
+
+
+@app.post("/api/attempt/<attempt_id>/confidence")
+def api_attempt_confidence(attempt_id):
+    """Optional self-rating, allowed only before the first message so it is a prediction, not a hindsight."""
+    s = get_store()
+    a = s.get("attempts", attempt_id)
+    if not a:
+        abort(404)
+    body = request.get_json(force=True, silent=True) or {}
+    try:
+        conf = int(body.get("confidence", 0))
+    except (TypeError, ValueError):
+        conf = 0
+    if conf not in (1, 2, 3, 4, 5):
+        return jsonify({"error": "confidence must be 1-5"}), 400
+    if (a.get("student_turns") or 0) > 0:
+        return jsonify({"error": "too late: you have already started explaining"}), 400
+    s.update("attempts", attempt_id, {"confidence_before": conf})
+    return jsonify({"ok": True})
 
 
 @app.post("/api/attempt/<attempt_id>/skip")
@@ -460,7 +481,95 @@ def api_vote(post_id):
     except KeyError:
         abort(404)
     p = get_store().get("posts", post_id)
-    return jsonify({"ok": True, "posts": logic.wall_for_outcome(p["outcome_id"], g.student_id)})
+    if p:
+        return jsonify({"ok": True, "posts": logic.wall_for_outcome(p["outcome_id"], g.student_id)})
+    return jsonify({"ok": True})
+
+
+# --------------------------------------------------------------------------
+# Q&A forum
+# --------------------------------------------------------------------------
+def _is_lecturer() -> bool:
+    return bool(session.get("lecturer"))
+
+
+@app.get("/w/<week_id>/questions")
+def forum(week_id):
+    s = get_store()
+    week = s.get("weeks", week_id)
+    if not week:
+        abort(404)
+    course = s.get("courses", week["course_id"]) or {}
+    threads = logic.forum_list(week_id, g.student_id)
+    return render_template("forum.html", week=week, course=course, threads=threads, lecturer=_is_lecturer(), back=request.args.get("back"))
+
+
+@app.post("/w/<week_id>/questions")
+@rate_limited(10)
+def forum_ask(week_id):
+    alias = re.sub(r"[^\w\- ]", "", request.form.get("alias", "")).strip()[:24]
+    role = "lecturer" if _is_lecturer() else "student"
+    try:
+        t = logic.forum_ask(week_id, g.student_id, alias or ("Lecturer" if role == "lecturer" else "a student"),
+                            request.form.get("title", ""), request.form.get("body", ""), role=role)
+    except KeyError:
+        abort(404)
+    except ValueError as e:
+        return render_template("error.html", title="Could not post", message=str(e)), 400
+    return redirect(url_for("forum_thread", thread_id=t["id"]))
+
+
+@app.get("/q/<thread_id>")
+def forum_thread(thread_id):
+    t = logic.forum_thread(thread_id, g.student_id)
+    if not t:
+        abort(404)
+    s = get_store()
+    week = s.get("weeks", t["week_id"]) or {}
+    course = s.get("courses", week.get("course_id", "")) or {}
+    return render_template("thread.html", t=t, week=week, course=course, lecturer=_is_lecturer())
+
+
+@app.post("/q/<thread_id>/reply")
+@rate_limited(20)
+def forum_reply(thread_id):
+    alias = re.sub(r"[^\w\- ]", "", request.form.get("alias", "")).strip()[:24]
+    role = "lecturer" if _is_lecturer() else "student"
+    try:
+        logic.forum_reply(thread_id, g.student_id, alias or ("Lecturer" if role == "lecturer" else "a student"), request.form.get("body", ""), role=role)
+    except KeyError:
+        abort(404)
+    except ValueError as e:
+        return render_template("error.html", title="Could not reply", message=str(e)), 400
+    return redirect(url_for("forum_thread", thread_id=thread_id))
+
+
+@app.post("/api/thread/<thread_id>/ai")
+@rate_limited(10)
+def api_forum_ai(thread_id):
+    try:
+        return jsonify({"draft": logic.forum_ai_draft(thread_id)})
+    except KeyError:
+        abort(404)
+
+
+@app.post("/api/thread/<thread_id>/set")
+@lecturer_required
+def api_forum_set(thread_id):
+    body = request.get_json(force=True, silent=True) or {}
+    if not logic.forum_set(thread_id, {k: bool(v) for k, v in body.items()}):
+        abort(404)
+    return jsonify({"ok": True})
+
+
+@app.post("/api/reply/<reply_id>/accept")
+@lecturer_required
+def api_forum_accept(reply_id):
+    try:
+        logic.forum_accept(reply_id)
+    except KeyError:
+        abort(404)
+    return jsonify({"ok": True})
 
 
 @app.get("/me")
@@ -497,6 +606,7 @@ def _courses_with_weeks():
         by_week.setdefault(w["course_id"], []).append(w)
         w["n_students"] = sum(1 for x in sessions if x["week_id"] == w["id"])
         w["n_outcomes"] = len(s.list("outcomes", week_id=w["id"]))
+        w["open_q"] = logic.forum_open_count(w["id"])
     for c in courses:
         c["weeks"] = sorted(by_week.get(c["id"], []), key=lambda w: w.get("number") or 0)
     return courses

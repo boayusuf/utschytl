@@ -178,16 +178,25 @@
     $("summary").hidden = true;
     const card = $("bigcard");
     card.classList.remove("flipped");
-    const a = state.attempts[oid];
-    if (!a || a.confidence_before == null) {
-      // confidence step first
-      $("confidence").hidden = false;
-      $("chat-wrap").hidden = true;
-      document.querySelectorAll("#conf-scale button").forEach((b) => b.setAttribute("aria-pressed", "false"));
-      renderRubric(o, [], null);
-      return;
+    let a = state.attempts[oid];
+    document.querySelectorAll("#conf-scale button").forEach((b) => b.setAttribute("aria-pressed", "false"));
+    if (!a) {
+      // start straight away; confidence is optional and can be tapped before the first message
+      try {
+        const data = await api("/api/attempt/start", { session_id: sessionId, outcome_id: oid, confidence: 0 });
+        a = state.attempts[oid] = data.attempt;
+      } catch (e) {
+        addMsg("tutor", "Could not start this outcome: " + e.message);
+        return;
+      }
     }
-    $("confidence").hidden = true;
+    const conf = $("confidence");
+    conf.hidden = (a.student_turns || 0) > 0 && !a.confidence_before;
+    conf.dataset.done = a.confidence_before ? "1" : "";
+    if (a.confidence_before) {
+      const b = document.querySelector(`#conf-scale button[data-v="${a.confidence_before}"]`);
+      if (b) b.setAttribute("aria-pressed", "true");
+    }
     $("input").disabled = false;
     $("send").disabled = false;
     await loadAttempt(a.id, o);
@@ -268,29 +277,17 @@
   // ---- events ----
   document.querySelectorAll("#conf-scale button").forEach((b) => {
     b.addEventListener("click", async () => {
-      if (state.busy) return;
-      state.busy = true;
+      const a = state.attempts[state.current];
+      if (!a) return;
       document.querySelectorAll("#conf-scale button").forEach((x) => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
       try {
-        const data = await api("/api/attempt/start", {
-          session_id: sessionId,
-          outcome_id: state.current,
-          confidence: Number(b.dataset.v),
-        });
-        state.attempts[state.current] = data.attempt;
-        $("confidence").hidden = true;
-        const o = state.outcomes.find((x) => x.id === state.current);
-        $("chat").innerHTML = "";
-        data.turns.forEach((t) => addMsg(t.role, t.content));
-        $("chat-wrap").hidden = false;
-        renderRubric(o, [], null);
-        renderNav();
-        $("input").focus();
+        await api(`/api/attempt/${a.id}/confidence`, { confidence: Number(b.dataset.v) });
+        a.confidence_before = Number(b.dataset.v);
+        $("confidence").dataset.done = "1";
       } catch (e) {
-        alert("Could not start: " + e.message);
-      } finally {
-        state.busy = false;
+        /* optional; ignore */
       }
+      $("input").focus();
     });
   });
 
@@ -314,6 +311,7 @@
       a.met_ids = metIds;
       a.status = res.status;
       a.student_turns = res.student_turns;
+      if (!a.confidence_before) $("confidence").hidden = true;
       renderRubric(o, metIds, target);
       addMsg("tutor", res.tutor.content, { hint: res.hint, mastered: res.status === "mastered" });
       renderNav();
@@ -417,7 +415,7 @@
     if (pre && state.outcomes.some((o) => o.id === pre)) {
       if (recall) {
         // a fresh, short re-explain attempt a few days after mastering
-        const data = await api("/api/attempt/start", { session_id: sessionId, outcome_id: pre, confidence: 3, kind: "recall" });
+        const data = await api("/api/attempt/start", { session_id: sessionId, outcome_id: pre, confidence: 0, kind: "recall" });
         state.attempts[pre] = data.attempt;
       }
       select(pre);

@@ -30,6 +30,7 @@
             <div class="actions">
               {% if w.status == 'published' %}<span class="pill pill-teal">Published</span>{% else %}<span class="pill pill-amber">Draft</span>{% endif %}
               <a class="btn btn-sm btn-secondary" href="/teach/week/{{ w.id }}">Edit outcomes</a>
+              <a class="btn btn-sm btn-secondary" href="/w/{{ w.id }}/questions?back=/teach">Questions{% if w.open_q %} ({{ w.open_q }} open){% endif %}</a>
               <a class="btn btn-sm" href="/teach/week/{{ w.id }}/report">Gap report</a>
             </div>
           </div>

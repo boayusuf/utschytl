@@ -100,6 +100,32 @@ create table if not exists votes (
   value int not null default 0
 );
 
+create table if not exists threads (                  -- Q&A forum: one question per thread, per week
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  week_id uuid references weeks(id) on delete cascade,
+  student_id uuid,
+  alias text,
+  role text default 'student',                        -- student | lecturer
+  title text not null,
+  body text,
+  answered boolean default false,                     -- lecturer marked a reply as the answer
+  pinned boolean default false,
+  ai_draft text,                                      -- optional AI first take, labelled as such
+  ai_confirmed boolean default false                  -- lecturer confirmed the AI draft
+);
+
+create table if not exists replies (
+  id uuid primary key default gen_random_uuid(),
+  created_at timestamptz not null default now(),
+  thread_id uuid references threads(id) on delete cascade,
+  student_id uuid,
+  alias text,
+  role text default 'student',                        -- student | lecturer
+  body text not null,
+  accepted boolean default false
+);
+
 create table if not exists turns (
   id uuid primary key default gen_random_uuid(),
   created_at timestamptz not null default now(),
@@ -121,6 +147,8 @@ create index if not exists idx_materials_session on materials(session_id);
 create index if not exists idx_chats_session on chats(session_id);
 create index if not exists idx_posts_outcome on posts(outcome_id);
 create index if not exists idx_votes_post on votes(post_id);
+create index if not exists idx_threads_week on threads(week_id);
+create index if not exists idx_replies_thread on replies(thread_id);
 
 -- If you created the tables before the class-wall / learn-mode update, run these too:
 alter table sessions add column if not exists student_id uuid;
@@ -140,11 +168,13 @@ alter table materials enable row level security;
 alter table chats    enable row level security;
 alter table posts    enable row level security;
 alter table votes    enable row level security;
+alter table threads  enable row level security;
+alter table replies  enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['courses','weeks','outcomes','sessions','attempts','turns','materials','chats','posts','votes'] loop
+  foreach t in array array['courses','weeks','outcomes','sessions','attempts','turns','materials','chats','posts','votes','threads','replies'] loop
     execute format('drop policy if exists demo_all on %I', t);
     execute format('create policy demo_all on %I for all to anon, authenticated using (true) with check (true)', t);
   end loop;

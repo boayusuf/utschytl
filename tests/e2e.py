@@ -89,6 +89,22 @@ async def main():
         await page.wait_for_selector("#outcome-nav .group")
         assert await page.locator("#outcome-nav .group").count() >= 2, "expected 'This week' and 'My own cards' groups"
 
+        # ---- question board: ask, AI first take, vote
+        await page.goto(f"{BASE}/learn/s/{sid}")
+        await page.wait_for_selector("a:has-text('Questions')")
+        await page.click("a:has-text('Questions')")
+        await page.wait_for_selector("#askform")
+        await page.fill("#title", "Why is binary search log n and not n/2?")
+        await page.fill("#body", "I thought it looks at half the elements.")
+        await page.click("#askform button[type=submit]")
+        await page.wait_for_selector("#aibtn")
+        await page.click("#aibtn")
+        await page.wait_for_selector("#aitext", timeout=60000)
+        await page.click("[data-vote] >> nth=0")
+        await page.wait_for_selector("#thread")
+        thread_url = page.url
+        await page.screenshot(path=OUT / "05f-thread.png", full_page=True)
+
         # ---- profile
         await page.goto(BASE + "/me")
         await page.wait_for_selector(".tiles")
@@ -127,6 +143,15 @@ async def main():
         await page.wait_for_function("document.getElementById('save-status').textContent === 'All changes saved'", timeout=5000)
         await page.click("#publish")
         await page.wait_for_selector(".pill-teal")
+        # lecturer answers the question and accepts it
+        await page.goto(thread_url)
+        await page.fill("#body", "Each step halves what is left; count the halvings.")
+        await page.click("form[action$='/reply'] button[type=submit]")
+        await page.wait_for_selector("[data-accept]")
+        await page.click("[data-accept] >> nth=0")
+        await page.wait_for_selector("text=Accepted answer")
+        await page.click("[data-set='ai_confirmed']")
+        await page.wait_for_selector("text=confirmed by the lecturer")
         # report of the seeded week
         await page.goto(BASE + "/teach")
         href = await page.locator("a:has-text('Gap report')").first.get_attribute("href")

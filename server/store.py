@@ -21,7 +21,7 @@ import requests
 
 from . import config
 
-TABLES = ("courses", "weeks", "outcomes", "sessions", "attempts", "turns", "materials", "chats", "posts", "votes")
+TABLES = ("courses", "weeks", "outcomes", "sessions", "attempts", "turns", "materials", "chats", "posts", "votes", "threads", "replies")
 
 
 def now_iso() -> str:
@@ -81,11 +81,13 @@ class JsonStore:
 
     # child table -> (foreign key column, parent table); mirrors the ON DELETE CASCADE rules in sql/schema.sql
     _CASCADE = {
-        "weeks": [("outcomes", "week_id"), ("sessions", "week_id"), ("posts", "week_id")],
+        "weeks": [("outcomes", "week_id"), ("sessions", "week_id"), ("posts", "week_id"), ("threads", "week_id")],
         "sessions": [("attempts", "session_id"), ("materials", "session_id"), ("chats", "session_id"), ("posts", "session_id"), ("outcomes", "session_id")],
         "outcomes": [("attempts", "outcome_id"), ("posts", "outcome_id")],
         "attempts": [("turns", "attempt_id")],
         "posts": [("votes", "post_id")],
+        "threads": [("replies", "thread_id"), ("votes", "post_id")],
+        "replies": [("votes", "post_id")],
     }
 
     def delete(self, table: str, id: str) -> None:

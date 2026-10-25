@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Questions · {{ week.title }} · {{ APP_NAME }}{% endblock %}
+{% block content %}
+<div class="wrap wrap-narrow">
+  <div class="page-head">
+    <div>
+      <p class="muted" style="margin:0">{% if back %}<a href="{{ back }}">← Back</a> · {% endif %}{{ course.title }}{% if week.number %} · Week {{ week.number }}{% endif %}</p>
+      <h1 style="margin-top:0.25rem">Questions</h1>
+      <p class="muted">Ask anything about this week. Classmates answer, the lecturer answers, votes sort it. You can ask the AI for a first take; it is labelled until the lecturer confirms it.</p>
+    </div>
+    {% if lecturer %}<span class="pill pill-teal">You are signed in as lecturer</span>{% endif %}
+  </div>
+
+  <form method="post" class="panel" id="askform">
+    <div class="field"><label for="title">Your question</label><input id="title" name="title" type="text" required maxlength="160" placeholder="e.g. Why is binary search log n and not n/2?"></div>
+    <div class="field"><label for="body">Details (optional)</label><textarea id="body" name="body" style="min-height:70px" placeholder="What you tried, which slide, what confuses you"></textarea></div>
+    <div class="row" style="align-items:flex-end">
+      <div class="field" style="flex:0 1 220px"><label for="alias">Name or nickname</label><input id="alias" name="alias" type="text" maxlength="24" placeholder="{{ 'Lecturer' if lecturer else 'optional' }}"></div>
+      <div class="field" style="flex:0 0 auto"><button class="btn" type="submit">Ask</button></div>
+    </div>
+  </form>
+
+  {% if not threads %}
+  <div class="empty" style="margin-top:1rem">No questions yet. Yours will be the first.</div>
+  {% endif %}
+  <div class="week-list" style="margin-top:1rem">
+    {% for t in threads %}
+    <a class="week-row" href="/q/{{ t.id }}" style="text-decoration:none; color:inherit">
+      <div>
+        <b>{{ t.title }}</b>
+        {% if t.pinned %}<span class="pill pill-amber">Pinned</span>{% endif %}
+        {% if t.answered %}<span class="pill pill-teal">Answered</span>{% elif t.lecturer_replied %}<span class="pill">Lecturer replied</span>{% endif %}
+        <br><span class="muted">{{ t.alias }}{% if t.role == 'lecturer' %} (lecturer){% endif %} · {{ t.n_replies }} repl{{ 'y' if t.n_replies == 1 else 'ies' }} · ▲ {{ t.score }}</span>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}
