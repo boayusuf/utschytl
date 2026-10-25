@@ -48,12 +48,28 @@ async def main():
         await page.wait_for_selector(".bigcard.flipped", timeout=10000)
         await page.screenshot(path=OUT / "04-practice-mastered.png", full_page=True)
         await page.click("#next-btn")
-        await page.wait_for_selector("#confidence:not([hidden])")
+        await page.wait_for_selector("#chat .msg.tutor")
+        # stuck path: three weak tries -> reveal -> explain back -> "seen"
+        for m in ["no idea", "something about speed", "its fast i guess"]:
+            n = await page.locator("#chat .msg.tutor").count()
+            await page.fill("#input", m)
+            await page.click("#send")
+            await page.wait_for_function(f"document.querySelectorAll('#chat .msg.tutor').length > {n}")
+        await page.wait_for_selector("#reveal:not([hidden])")
+        await page.click("#reveal")
+        await page.wait_for_selector("#chat .msg.reveal")
+        await page.screenshot(path=OUT / "04b-reveal.png", full_page=True)
+        await page.click("#chat .msg.reveal button")
+        await page.fill("#input", "For large n the linear part dominates so 3n+20 and n have the same shape of growth. But in practice with small inputs or tight loops in real-time code, the constant factors still matter.")
+        await page.click("#send")
+        await page.wait_for_selector(".bigcard.flipped", timeout=10000)
+        assert "Seen the answer" in await page.locator("#face-back .pill").text_content()
+        await page.click("#next-btn")
+        await page.wait_for_selector("#chat .msg.tutor")
         # skip the rest quickly to reach the summary
         for _ in range(12):
             if await page.locator("#summary:not([hidden])").count():
                 break
-            await page.click('#conf-scale button[data-v="2"]')
             await page.wait_for_selector("#chat-wrap:not([hidden])")
             await page.click("#skip")
             await page.wait_for_timeout(150)

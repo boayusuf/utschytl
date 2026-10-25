@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect width="256" height="256" rx="56" fill="#16202A"/>
+  <!-- speech bubble, tail pointing back to the speaker (explain it back) -->
+  <path d="M72 70h112a26 26 0 0 1 26 26v52a26 26 0 0 1-26 26h-70l-38 30v-30h-4a26 26 0 0 1-26-26V96a26 26 0 0 1 26-26z" fill="#0E7C66"/>
+  <!-- tick inside: understanding shown -->
+  <path d="M102 124l18 18 36-40" fill="none" stroke="#FFFFFF" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

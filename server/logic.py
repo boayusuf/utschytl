@@ -43,14 +43,17 @@ def _evidence_in_student_text(evidence: str, student_text: str) -> bool:
     return len(ew) >= 4 and sum(1 for w in ew if w in sw) / len(ew) >= 0.8
 
 
-def _strip_echoes(student_text: str, outcome: dict) -> str:
-    """Remove any rubric line the student pasted back verbatim, so it can never serve as evidence."""
+def _strip_echoes(student_text: str, outcome: dict, extra: list[str] | None = None) -> str:
+    """Remove any rubric line, or any sentence of a revealed answer, that the student pasted back verbatim,
+    so copied text can never serve as evidence."""
     st = _norm(student_text)
-    for c in outcome["criteria"]:
-        for line in (c.get("text", ""), c.get("student_label", "")):
-            n = _norm(line)
-            if len(n) > 15:
-                st = st.replace(n, " ")
+    lines = [l for c in outcome["criteria"] for l in (c.get("text", ""), c.get("student_label", ""))]
+    for t in extra or []:
+        lines += re.split(r"(?<=[.!?])\s+|\n+", t)
+    for line in lines:
+        n = _norm(line)
+        if len(n) > 15:
+            st = st.replace(n, " ")
     return st
 
 
@@ -140,8 +143,8 @@ def draft_outcomes(course_title: str, material: str) -> dict:
 # --------------------------------------------------------------------------
 # 2. Judging the student's explanation
 # --------------------------------------------------------------------------
-def _mock_judge(outcome: dict, turns: list[dict]) -> dict:
-    student_text = _strip_echoes(" ".join(t["content"] for t in turns if t["role"] == "student"), outcome)
+def _mock_judge(outcome: dict, turns: list[dict], extra_strip: list[str] | None = None) -> dict:
+    student_text = _strip_echoes(" ".join(t["content"] for t in turns if t["role"] == "student"), outcome, extra_strip)
     words = _keywords(student_text)
     last = next((t["content"] for t in reversed(turns) if t["role"] == "student"), "")
     gave_up = bool(re.search(r"\b(i don'?t know|no idea|just tell me|give me the answer|idk)\b", last.lower()))
@@ -164,7 +167,7 @@ def _mock_judge(outcome: dict, turns: list[dict]) -> dict:
     return {"criteria": res, "misconceptions": misc, "gave_up": gave_up, "summary": "Mock judge summary."}
 
 
-def judge(outcome: dict, turns: list[dict]) -> dict:
+def judge(outcome: dict, turns: list[dict], extra_strip: list[str] | None = None) -> dict:
     """Run the judge JUDGE_VOTES times; a criterion counts as met only if every vote agrees."""
     user = prompts.JUDGE_USER.format(
         title=outcome["title"],
@@ -176,11 +179,11 @@ def judge(outcome: dict, turns: list[dict]) -> dict:
     n_votes = 1 if config.LLM_PROVIDER == "mock" else max(1, config.JUDGE_VOTES)
     for i in range(n_votes):
         v = llm.complete_json(
-            prompts.JUDGE_SYSTEM, user, temperature=0.1 + 0.2 * i, mock=lambda: _mock_judge(outcome, turns)
+            prompts.JUDGE_SYSTEM, user, temperature=0.1 + 0.2 * i, mock=lambda: _mock_judge(outcome, turns, extra_strip)
         )
         votes.append(v)
 
-    student_text = _strip_echoes(" ".join(t["content"] for t in turns if t["role"] == "student"), outcome)
+    student_text = _strip_echoes(" ".join(t["content"] for t in turns if t["role"] == "student"), outcome, extra_strip)
     by_id: dict[str, list[dict]] = defaultdict(list)
     for v in votes:
         for c in v.get("criteria", []):
@@ -232,7 +235,7 @@ def _mock_tutor(outcome: dict, turns: list[dict], target: dict | None, attempts:
     msg = _MOCK_PROBES[i].format(said=said)
     if target and attempts >= config.HINT_AFTER_ATTEMPTS:
         label = target.get("student_label") or "the part you have not covered yet"
-        msg = f"Hint: look again at the prompt and focus on this: {label.lower()}. " + msg
+        msg = f"Look again at the prompt and focus on this: {label.lower()}. " + msg
     return msg
 
 
@@ -342,8 +345,13 @@ def student_message(attempt_id: str, content: str) -> dict:
     content = content.strip()[:2000]
     s.insert("turns", {"attempt_id": attempt_id, "role": "student", "content": content, "judge": None})
     turns = sorted(s.list("turns", attempt_id=attempt_id), key=lambda t: t["created_at"])
+    revealed_text = attempt.get("revealed_text") or ""
+    if revealed_text:
+        # after a reveal, only what the student writes AFTER seeing the answer counts, and copied sentences are stripped
+        cut = attempt.get("revealed_at") or ""
+        turns = [t for t in turns if t.get("created_at", "") > cut and not (t.get("meta") or {}).get("reveal")]
 
-    j = judge(outcome, turns)
+    j = judge(outcome, turns, [revealed_text] if revealed_text else None)
     # Ticks never go grey again: once the student has shown a point, it stays shown.
     prev_met = set(attempt.get("met_ids") or [])
     for c in j["criteria"]:
@@ -367,11 +375,18 @@ def student_message(attempt_id: str, content: str) -> dict:
         "last_judge": {"criteria": j["criteria"], "summary": j["summary"], "votes": j["votes"]},
     }
 
-    if all_met:
+    if all_met and revealed_text:
+        # explained back after seeing the answer: good, but not the same as understood unaided
+        patch.update({"status": "seen", "mastered_at": now_iso()})
+        tutor = {
+            "text": f"You've put it in your own words now. This one is marked 'seen the answer' rather than 'understood', and it will come back in {config.RECALL_AFTER_DAYS} days to check it stuck.",
+            "target_id": None, "hint": False, "gated": False,
+        }
+    elif all_met:
         reply = mastered_message(outcome, j)
         patch.update({"status": "mastered", "mastered_at": now_iso()})
         tutor = {"text": reply, "target_id": None, "hint": False, "gated": False}
-    elif student_turns >= config.MAX_TURNS_PER_OUTCOME:
+    elif student_turns >= config.MAX_TURNS_PER_OUTCOME and not revealed_text:
         tutor = {
             "text": "Let's park this one for now and come back to it later. You can mark it 'skip' and move on; your attempt is saved.",
             "target_id": first_unmet,
@@ -393,13 +408,41 @@ def student_message(attempt_id: str, content: str) -> dict:
             "meta": {"hint": tutor["hint"], "gated": tutor["gated"], "target_id": tutor["target_id"]},
         },
     )
+    status = patch.get("status", "in_progress")
     return {
         "tutor": t,
         "criteria": j["criteria"],
-        "status": patch.get("status", "in_progress"),
+        "status": status,
         "hint": tutor["hint"],
         "student_turns": student_turns,
+        "can_reveal": status == "in_progress" and not revealed_text and student_turns >= config.REVEAL_AFTER_TURNS,
     }
+
+
+def reveal_answer(attempt_id: str) -> dict:
+    """The student is stuck and asks to see it. Show a full explanation, then require them to say it back."""
+    s = get_store()
+    attempt = s.get("attempts", attempt_id)
+    if not attempt:
+        raise KeyError("attempt not found")
+    if attempt.get("revealed_text"):
+        return {"text": attempt["revealed_text"]}
+    if (attempt.get("student_turns") or 0) < config.REVEAL_AFTER_TURNS:
+        raise ValueError(f"Try at least {config.REVEAL_AFTER_TURNS} times first. The trying is what makes the answer stick.")
+    outcome = s.get("outcomes", attempt["outcome_id"])
+    turns = sorted(s.list("turns", attempt_id=attempt_id), key=lambda t: t["created_at"])
+    student = "\n".join(t["content"] for t in turns if t["role"] == "student")[-3000:]
+    crit = "\n".join(f"- {c['text']}" for c in outcome["criteria"])
+    text = llm.complete_text(
+        prompts.REVEAL_SYSTEM.format(criteria=crit),
+        prompts.REVEAL_USER.format(title=outcome["title"], prompt=outcome["prompt"], student=student or "(nothing yet)"),
+        temperature=0.4,
+        mock=lambda: " ".join(c["text"].rstrip(".") + "." for c in outcome["criteria"]) + "\nNow close this and explain it back in your own words.",
+    ).strip()
+    now = now_iso()
+    s.insert("turns", {"attempt_id": attempt_id, "role": "tutor", "content": text, "judge": None, "meta": {"reveal": True}, "created_at": now})
+    s.update("attempts", attempt_id, {"revealed_text": text, "revealed_at": now, "met_ids": []})
+    return {"text": text}
 
 
 def skip_attempt(attempt_id: str) -> dict | None:
@@ -481,6 +524,7 @@ def week_report(week_id: str) -> dict:
                 "avg_conf_mastered": round(sum(conf_mastered) / len(conf_mastered), 1) if conf_mastered else None,
                 "avg_conf_not_mastered": round(sum(conf_not) / len(conf_not), 1) if conf_not else None,
                 # "felt vs shown": students who rated themselves >=4 but did not master
+                "revealed_n": sum(1 for a in atts if a.get("revealed_text")),
                 "overconfident_n": sum(
                     1
                     for a in atts
@@ -804,8 +848,8 @@ def student_profile(student_id: str) -> dict:
         if c in bins:
             bins[c][0] += 1
             bins[c][1] += int(mastered)
-        if mastered:
-            row["mastered"] += 1
+        if mastered or a.get("status") == "seen":
+            row["mastered"] += int(mastered)
             ma = a.get("mastered_at")
             if ma:
                 try:
@@ -816,7 +860,7 @@ def student_profile(student_id: str) -> dict:
                     later = [b for b in attempts if b["outcome_id"] == a["outcome_id"] and b.get("kind") == "recall" and b.get("created_at", "") > ma]
                     if not later:
                         due.append({"outcome": o, "week": w, "days": (now - t).days, "session_id": a["session_id"]})
-        elif c >= 4:
+        if not mastered and c >= 4:
             row["overconfident"] += 1
             over.append({"outcome": o, "week": w, "confidence": c, "session_id": a["session_id"]})
     calib = [{"confidence": k, "n": v[0], "shown_pct": (round(100 * v[1] / v[0]) if v[0] else None)} for k, v in bins.items()]

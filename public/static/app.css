@@ -127,11 +127,13 @@ textarea { min-height: 120px; resize: vertical; }
 .dot { flex: none; width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--line-strong); margin-top: 0.4rem; background: var(--surface); }
 .dot.in_progress { border-color: var(--amber); background: var(--amber-soft); }
 .dot.mastered { border-color: var(--teal); background: var(--teal); }
+.dot.seen { border-color: var(--amber); background: var(--amber); }
 .dot.skipped, .dot.parked { border-color: var(--slate); background: var(--line); }
 .progress { display: flex; gap: 4px; margin: 0.5rem 0 1rem; }
 .progress span { flex: 1; height: 8px; border-radius: 4px; background: var(--line); }
 .progress span.in_progress { background: var(--amber); }
 .progress span.mastered { background: var(--teal); }
+.progress span.seen { background: var(--amber); opacity: 0.7; }
 .progress span.skipped, .progress span.parked { background: var(--line-strong); }
 
 .bigcard {
@@ -166,6 +168,8 @@ textarea { min-height: 120px; resize: vertical; }
 .msg.tutor { background: var(--tutor); border-bottom-left-radius: 4px; align-self: start; white-space: pre-wrap; }
 .msg.student { background: var(--ink); color: #fff; border-bottom-right-radius: 4px; justify-self: end; }
 .msg.mastered { background: var(--teal-soft); border: 1px solid #bfe2d8; }
+.msg.reveal { background: var(--amber-soft); border: 1px solid #ecd9a7; max-width: 92%; }
+.msg.reveal .reveal-body { white-space: pre-wrap; }
 .msg .tag { display: inline-block; font-size: 0.75rem; font-weight: 700; color: var(--amber); margin-bottom: 0.2rem; }
 .typing { display: inline-flex; gap: 4px; padding: 0.4rem 0.2rem; }
 .typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--slate); animation: blink 1.2s infinite; }

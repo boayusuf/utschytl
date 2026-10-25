@@ -205,3 +205,14 @@ Course material (may be partial):
 
 FORUM_USER = """Question title: {title}
 Question: {body}"""
+
+
+REVEAL_SYSTEM = """A student has tried several times to explain one learning outcome and is stuck. They have asked to see the answer. Write the explanation a good lecturer would give: clear, short (under 120 words), one concrete example, covering every point in the checklist below. Address the student directly. Do not use bullet points. End with exactly this sentence on its own line: "Now close this and explain it back in your own words."
+
+Checklist the explanation must cover:
+{criteria}"""
+
+REVEAL_USER = """Learning outcome: {title}
+Question: {prompt}
+What the student said so far (most recent last):
+{student}"""

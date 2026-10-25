@@ -33,6 +33,7 @@ MIN_STUDENTS_FOR_QUOTES = int(os.environ.get("MIN_STUDENTS_FOR_QUOTES", "5"))
 HINT_AFTER_ATTEMPTS = int(os.environ.get("HINT_AFTER_ATTEMPTS", "2"))
 MAX_TURNS_PER_OUTCOME = int(os.environ.get("MAX_TURNS_PER_OUTCOME", "12"))
 JUDGE_VOTES = int(os.environ.get("JUDGE_VOTES", "2"))  # independent judge calls that must agree
+REVEAL_AFTER_TURNS = int(os.environ.get("REVEAL_AFTER_TURNS", "3"))  # "Show me the answer" appears after this many tries
 RECALL_AFTER_DAYS = int(os.environ.get("RECALL_AFTER_DAYS", "3"))  # spaced re-explain comes due after this
 MAX_MATERIAL_CHARS = int(os.environ.get("MAX_MATERIAL_CHARS", "120000"))  # per session, student-added material
 

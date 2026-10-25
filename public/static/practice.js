@@ -147,8 +147,29 @@
   function addMsg(role, text, opts = {}) {
     const chat = $("chat");
     const d = document.createElement("div");
-    d.className = `msg ${role}` + (opts.mastered ? " mastered" : "");
+    d.className = `msg ${role}` + (opts.mastered ? " mastered" : "") + (opts.reveal ? " reveal" : "");
     if (opts.hint) d.innerHTML = `<span class="tag">Hint</span><br>`;
+    if (opts.reveal) {
+      d.innerHTML = `<span class="tag">The answer</span><br>`;
+      const body = document.createElement("div");
+      body.className = "reveal-body";
+      body.textContent = text;
+      d.appendChild(body);
+      const hide = document.createElement("button");
+      hide.type = "button";
+      hide.className = "btn btn-sm btn-secondary";
+      hide.style.marginTop = "0.6rem";
+      hide.textContent = "Hide it, I'll explain it back";
+      hide.addEventListener("click", () => {
+        body.hidden = !body.hidden;
+        hide.textContent = body.hidden ? "Show it again" : "Hide it, I'll explain it back";
+        if (body.hidden) $("input").focus();
+      });
+      d.appendChild(hide);
+      chat.appendChild(d);
+      d.scrollIntoView({ block: "nearest", behavior: "smooth" });
+      return d;
+    }
     d.appendChild(document.createTextNode(text));
     chat.appendChild(d);
     d.scrollIntoView({ block: "nearest", behavior: "smooth" });
@@ -175,6 +196,7 @@
     $("wall-panel").hidden = (o.kind || "week") !== "week";
     if (!$("wall-panel").hidden) loadWall(oid);
     $("wallstatus").textContent = "";
+    $("wallinput").value = "";
     $("summary").hidden = true;
     const card = $("bigcard");
     card.classList.remove("flipped");
@@ -207,11 +229,12 @@
     state.attempts[o.id] = { ...state.attempts[o.id], ...data.attempt };
     const chat = $("chat");
     chat.innerHTML = "";
-    data.turns.forEach((t) => addMsg(t.role, t.content, { hint: t.meta && t.meta.hint, mastered: data.attempt.status === "mastered" && t.role === "tutor" && t === data.turns[data.turns.length - 1] }));
+    data.turns.forEach((t) => addMsg(t.role, t.content, { hint: t.meta && t.meta.hint, reveal: t.meta && t.meta.reveal, mastered: data.attempt.status === "mastered" && t.role === "tutor" && t === data.turns[data.turns.length - 1] }));
     $("chat-wrap").hidden = false;
     renderRubric(o, data.attempt.met_ids || [], null);
-    if (data.attempt.status === "mastered") {
-      showMastered(o, data.turns[data.turns.length - 1].content);
+    $("reveal").hidden = !data.attempt.can_reveal;
+    if (data.attempt.status === "mastered" || data.attempt.status === "seen") {
+      showMastered(o, data.turns[data.turns.length - 1].content, data.attempt.status === "seen");
     } else if (data.attempt.status === "parked") {
       $("input").disabled = true;
       $("send").disabled = true;
@@ -224,8 +247,12 @@
     renderNav();
   }
 
-  function showMastered(o, summary) {
+  function showMastered(o, summary, seen = false) {
     $("back-summary").textContent = summary;
+    const pill = document.querySelector("#face-back .pill");
+    pill.textContent = seen ? "Seen the answer, explained back" : "Understood";
+    pill.className = "pill " + (seen ? "pill-amber" : "pill-teal");
+    $("reveal").hidden = true;
     const mine = Array.from(document.querySelectorAll("#chat .msg.student")).map((d) => d.textContent);
     if (mine.length && !$("wallinput").value) {
       $("wallinput").value = mine[mine.length - 1];
@@ -243,7 +270,7 @@
     for (let k = 1; k <= order.length; k++) {
       const id = order[(i + k) % order.length];
       const st = statusOf(id);
-      if (st !== "mastered" && st !== "skipped" && st !== "parked") return id;
+      if (!["mastered", "seen", "skipped", "parked"].includes(st)) return id;
     }
     return null;
   }
@@ -251,6 +278,7 @@
   function showSummary() {
     const mastered = state.outcomes.filter((o) => statusOf(o.id) === "mastered").length;
     const skipped = state.outcomes.filter((o) => ["skipped", "parked"].includes(statusOf(o.id))).length;
+    const seen = state.outcomes.filter((o) => statusOf(o.id) === "seen").length;
     const mins = Math.max(1, Math.round((Date.now() - state.startedAt) / 60000));
     const over = state.outcomes.filter((o) => {
       const a = state.attempts[o.id];
@@ -258,6 +286,7 @@
     }).length;
     $("summary-grid").innerHTML = [
       [mastered, "outcomes understood"],
+      [seen, "needed the answer (back in 3 days)"],
       [skipped, "skipped or parked"],
       [mins, "minutes"],
       [over, "felt sure (4–5) but not yet shown"],
@@ -313,10 +342,11 @@
       a.student_turns = res.student_turns;
       if (!a.confidence_before) $("confidence").hidden = true;
       renderRubric(o, metIds, target);
-      addMsg("tutor", res.tutor.content, { hint: res.hint, mastered: res.status === "mastered" });
+      addMsg("tutor", res.tutor.content, { hint: res.hint, mastered: res.status === "mastered" || res.status === "seen" });
+      $("reveal").hidden = !res.can_reveal;
       renderNav();
-      if (res.status === "mastered") {
-        setTimeout(() => showMastered(o, res.tutor.content), 600);
+      if (res.status === "mastered" || res.status === "seen") {
+        setTimeout(() => showMastered(o, res.tutor.content, res.status === "seen"), 600);
       } else if (res.status === "parked") {
         $("send").disabled = true;
         input.disabled = true;
@@ -338,6 +368,31 @@
     if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
       e.preventDefault();
       $("composer").requestSubmit();
+    }
+  });
+
+  $("reveal").addEventListener("click", async () => {
+    const a = state.attempts[state.current];
+    if (!a || state.busy) return;
+    state.busy = true;
+    $("reveal").disabled = true;
+    typing(true);
+    try {
+      const res = await api(`/api/attempt/${a.id}/reveal`, {});
+      typing(false);
+      addMsg("tutor", res.text, { reveal: true });
+      a.revealed = true;
+      $("reveal").hidden = true;
+      const o = state.outcomes.find((x) => x.id === state.current);
+      a.met_ids = [];
+      renderRubric(o, [], null);
+      $("rubric-note").textContent = "Now explain it back in your own words. Copied sentences don't count.";
+    } catch (e) {
+      typing(false);
+      addMsg("tutor", "Could not show the answer: " + e.message);
+    } finally {
+      $("reveal").disabled = false;
+      state.busy = false;
     }
   });
 
@@ -421,7 +476,7 @@
       select(pre);
       return;
     }
-    const first = state.outcomes.find((o) => !["mastered", "skipped", "parked"].includes(statusOf(o.id))) || state.outcomes[0];
+    const first = state.outcomes.find((o) => !["mastered", "seen", "skipped", "parked"].includes(statusOf(o.id))) || state.outcomes[0];
     if (first) select(first.id);
   })();
 })();

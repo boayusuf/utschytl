@@ -55,6 +55,7 @@
       {% if r.avg_conf_not_mastered or r.avg_conf_mastered %}
       <h4 style="margin-top:1rem">Felt vs shown</h4>
       <p style="font-size:0.95rem; margin:0">Average confidence before explaining: <b>{{ r.avg_conf_not_mastered or '—' }}</b> among students who did not get there, <b>{{ r.avg_conf_mastered or '—' }}</b> among those who did.
+        {% if r.revealed_n %}<br>{{ r.revealed_n }} student{{ '' if r.revealed_n == 1 else 's' }} needed to see the answer before they could explain it.{% endif %}
         {% if r.overconfident_n %}<br>{{ r.overconfident_n }} student{{ '' if r.overconfident_n == 1 else 's' }} rated themselves 4–5 and could not explain it: the illusion of understanding, measured.{% endif %}</p>
       {% endif %}
     </div>

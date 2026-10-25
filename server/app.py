@@ -303,7 +303,9 @@ def _attempt_payload(attempt_id: str) -> dict:
         abort(404)
     turns = sorted(s.list("turns", attempt_id=attempt_id), key=lambda t: t["created_at"])
     return {
-        "attempt": {k: a.get(k) for k in ("id", "outcome_id", "status", "confidence_before", "met_ids", "student_turns", "target_attempts")},
+        "attempt": {**{k: a.get(k) for k in ("id", "outcome_id", "status", "confidence_before", "met_ids", "student_turns", "target_attempts")},
+                    "revealed": bool(a.get("revealed_text")),
+                    "can_reveal": a.get("status") == "in_progress" and not a.get("revealed_text") and (a.get("student_turns") or 0) >= config.REVEAL_AFTER_TURNS},
         "turns": [{"role": t["role"], "content": t["content"], "meta": t.get("meta")} for t in turns],
     }
 
@@ -331,8 +333,20 @@ def api_attempt_message(attempt_id):
             "status": res["status"],
             "hint": res["hint"],
             "student_turns": res["student_turns"],
+            "can_reveal": res["can_reveal"],
         }
     )
+
+
+@app.post("/api/attempt/<attempt_id>/reveal")
+@rate_limited(10)
+def api_attempt_reveal(attempt_id):
+    try:
+        return jsonify(logic.reveal_answer(attempt_id))
+    except KeyError:
+        abort(404)
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
 
 
 @app.post("/api/attempt/<attempt_id>/confidence")
